@@ -1,0 +1,11 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "stubPath": ".venv/lib/python3.13/site-packages",
+  "reportMissingModuleSource": false,
+  "reportUnknownParameterType": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownVariableType": false,
+  "reportUnknownArgumentType": false,
+  "typeCheckingMode": "basic",
+}
