@@ -2,8 +2,11 @@ import socket
 import time
 
 import machine
+import urequests
 from neopixel import NeoPixel
 from network import WLAN
+
+import umsgpack
 
 WIFI_SSID = "Mia"
 WIFI_PASSWORD = "password"
@@ -11,6 +14,10 @@ WIFI_PASSWORD = "password"
 LED_RED = (255, 0, 0)
 LED_ORANGE = (255, 165, 0)
 LED_GREEN = (0, 255, 0)
+
+
+AWAYBREW_HOST = "miarolfe.com"
+AWAYBREW_PORT = 80
 
 
 def set_led_colour(colour):
@@ -73,6 +80,13 @@ def connect(wlan, networks):
     return False
 
 
+def send_msg(msg):
+    url = f"http://{AWAYBREW_HOST}:{AWAYBREW_PORT}/contact"
+    r = urequests.post(url, data=umsgpack.dumps(msg))
+    print(f"Sent: {msg}, Response: {r.status_code}")
+    r.close()
+
+
 def ping(host, num_pings=4):
     print(f"Pinging {host}...")
     try:
@@ -124,6 +138,7 @@ def main():
         set_led_colour(LED_GREEN)
 
         ping("miarolfe.com")
+        send_msg({"example": "Hello from HOMEBREW!"})
         print("HOMEBREW is online.")
     else:
         # Red to indicate disconnected

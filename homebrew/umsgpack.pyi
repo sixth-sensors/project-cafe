@@ -1,0 +1,6 @@
+# Stub so IDE doesn't complain that it can't find definitions
+
+from typing import Any
+
+def dumps(obj: Any) -> bytes: ...
+def loads(data: bytes) -> Any: ...
