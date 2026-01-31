@@ -1,5 +1,7 @@
 # Homebrew
 
+Make sure you have uv installed - it's how we handle the Python components of this project.
+
 ## Setup
 
 ```bash
