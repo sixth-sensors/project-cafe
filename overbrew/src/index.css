@@ -1,0 +1,25 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  --dark-brown: #2c1a07ff;
+  --light-brown: #6d3d14ff;
+  --dark-orange: #ff6e2fff;
+  --light-orange: #ff9e4eff;
+  --cream: #fff7f0ff;
+  --header-height: 70px;
+}
+
+@font-face {
+  font-family: 'CafeCoffee';
+  src: url('/fonts/Cafe Coffee.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  size-adjust: 145%;
+}
+
+body {
+  font-family: 'Roboto', 'Inter', sans-serif;
+  color: var(--dark-brown);
+  background-color: var(--cream);
+}
