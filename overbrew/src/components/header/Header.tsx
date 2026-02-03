@@ -1,25 +1,25 @@
 import './Header.css'
 import Logo from '../logo/Logo'
 
-export default function Header() {
+const Header = () => {
   return (
     <header className="header">
       <a className="header-logo" href="/">
         <Logo
-          width={150}
           beanColor="var(--dark-brown)"
           textColor="var(--cream)"
+          width={150}
         />
       </a>
       <nav className="header-nav">
         <ul className="header-nav-list">
           <li>
-            <a href="/" className="header-nav-link">
+            <a className="header-nav-link" href="/">
               Home
             </a>
           </li>
           <li>
-            <a href="/login" className="header-nav-link">
+            <a className="header-nav-link" href="/login">
               Login
             </a>
           </li>
@@ -28,3 +28,5 @@ export default function Header() {
     </header>
   )
 }
+
+export default Header

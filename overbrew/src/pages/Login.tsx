@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { FaEye, FaEyeSlash } from 'react-icons/fa6'
 import './Login.css'
 
-function Login() {
+const Login = () => {
   const [showPassword, setShowPassword] = useState(false)
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -17,21 +17,21 @@ function Login() {
       <form className="login-form" onSubmit={handleSubmit}>
         <div className="form-group">
           <label htmlFor="email">Email</label>
-          <input type="email" id="email" name="email" required />
+          <input id="email" name="email" required type="email" />
         </div>
         <div className="form-group">
           <label htmlFor="password">Password</label>
           <div className="password-input-wrapper">
             <input
-              type={showPassword ? 'text' : 'password'}
               id="password"
               name="password"
               required
+              type={showPassword ? 'text' : 'password'}
             />
             <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
+              onClick={() => setShowPassword(!showPassword)}
+              type="button"
             >
               {showPassword ? <FaEyeSlash /> : <FaEye />}
             </button>

@@ -3,13 +3,13 @@ import Header from './components/header/Header'
 import Home from './pages/Home'
 import Login from './pages/Login'
 
-function App() {
+const App = () => {
   return (
     <BrowserRouter>
       <Header />
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
+        <Route element={<Home />} path="/" />
+        <Route element={<Login />} path="/login" />
       </Routes>
     </BrowserRouter>
   )

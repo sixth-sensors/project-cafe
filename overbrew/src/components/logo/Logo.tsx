@@ -1,17 +1,16 @@
 import './Logo.css'
 import type { LogoProps } from './Logo.types'
-
-export default function Logo({
+const Logo = ({
   width = 150,
   textColor = 'var(--dark-brown)',
   beanColor = textColor,
-}: LogoProps) {
+}: LogoProps) => {
   return (
     <svg
       className="logo"
-      xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 189.48 37.74"
       width={width}
+      xmlns="http://www.w3.org/2000/svg"
     >
       <g className="logo-bean" style={{ fill: beanColor }}>
         <path d="M8.92.04C6.27.46,3.14,4.98,1.91,7.89-1.2,15.29-.26,26.32,2.93,33.47c1.68,3.78,4.89,6.22,6.96,1.33,3.28-7.73-2.65-19.59-1.96-28.32.17-2.17.74-4.29,1.68-6.1-.07-.47-.41-.38-.68-.34ZM16.18,2.16c-1.72-1.94-5.16-3.33-6.2.25-.75,2.57-.56,6.22-.26,8.91.87,7.81,4.39,15.42,1.72,23.29-.27.8-.68,1.53-.89,2.32.13.24,1.06-.18,1.27-.28,9.56-4.44,11.72-26.2,4.36-34.5Z" />
@@ -30,3 +29,5 @@ export default function Logo({
     </svg>
   )
 }
+
+export default Logo
