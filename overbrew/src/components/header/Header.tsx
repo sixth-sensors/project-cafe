@@ -14,8 +14,13 @@ export default function Header() {
       <nav className="header-nav">
         <ul className="header-nav-list">
           <li>
-            <a href="#" className="header-nav-link">
+            <a href="/" className="header-nav-link">
               Home
+            </a>
+          </li>
+          <li>
+            <a href="/login" className="header-nav-link">
+              Login
             </a>
           </li>
         </ul>

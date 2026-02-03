@@ -25,3 +25,17 @@
   font-weight: bold;
   font-size: 1.2rem;
 }
+
+.header-nav-link::after {
+  content: '';
+  display: block;
+  width: 0;
+  height: 2px;
+  margin-top: 2px;
+  background: var(--cream);
+  transition: width 0.3s;
+}
+
+.header-nav-link:hover::after {
+  width: 100%;
+}
