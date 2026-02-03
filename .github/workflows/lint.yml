@@ -36,6 +36,9 @@ jobs:
 
   eslint:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        folder: [overbrew]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,7 +49,7 @@ jobs:
         uses: tj-actions/changed-files@v45
         with:
           files: |
-            overbrew/**/*.{ts,tsx}
+            ${{ matrix.folder }}/**/*.{ts,tsx}
 
       - name: Setup Node.js
         if: steps.changed-files.outputs.any_changed == 'true'
@@ -54,14 +57,14 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: overbrew/package-lock.json
+          cache-dependency-path: ${{ matrix.folder }}/package-lock.json
 
       - name: Install dependencies
         if: steps.changed-files.outputs.any_changed == 'true'
-        working-directory: overbrew
+        working-directory: ${{ matrix.folder }}
         run: npm ci
 
       - name: Run lint
         if: steps.changed-files.outputs.any_changed == 'true'
-        working-directory: overbrew
+        working-directory: ${{ matrix.folder }}
         run: npm run lint
