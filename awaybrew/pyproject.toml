@@ -9,3 +9,8 @@ dependencies = [
     "msgpack>=1.1.2",
     "uvicorn[standard]>=0.40.0",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.0",
+]
