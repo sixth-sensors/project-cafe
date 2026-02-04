@@ -1,7 +1,7 @@
 import Logo from '../components/logo/Logo'
 import './Home.css'
 
-function Home() {
+const Home = () => {
   return (
     <main className="home">
       <div className="welcome-banner">

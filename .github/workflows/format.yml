@@ -1,0 +1,71 @@
+name: Format
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        folder: [awaybrew, homebrew, autobrew]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed Python files
+        id: changed-files
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            **/*.py
+          path: ${{ matrix.folder }}
+
+      - name: Install uv
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: astral-sh/setup-uv@v5
+
+      - name: Run ruff check
+        if: steps.changed-files.outputs.any_changed == 'true'
+        working-directory: ${{ matrix.folder }}
+        run: uvx ruff format --check ${{ steps.changed-files.outputs.all_changed_files }}
+
+  prettier:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        folder: [overbrew]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            ${{ matrix.folder }}/**/*.{ts,tsx,css}
+
+      - name: Setup Node.js
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: ${{ matrix.folder }}/package-lock.json
+
+      - name: Install dependencies
+        if: steps.changed-files.outputs.any_changed == 'true'
+        working-directory: ${{ matrix.folder }}
+        run: npm ci
+
+      - name: Run format check
+        if: steps.changed-files.outputs.any_changed == 'true'
+        working-directory: ${{ matrix.folder }}
+        run: npm run format:check
