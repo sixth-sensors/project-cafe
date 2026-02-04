@@ -23,7 +23,8 @@ jobs:
         uses: tj-actions/changed-files@v45
         with:
           files: |
-            ${{ matrix.folder }}/**/*.py
+            **/*.py
+          path: ${{ matrix.folder }}
 
       - name: Install uv
         if: steps.changed-files.outputs.any_changed == 'true'
@@ -49,14 +50,15 @@ jobs:
         uses: tj-actions/changed-files@v45
         with:
           files: |
-            ${{ matrix.folder }}/**/*.{ts,tsx}
+            **/*.{ts,tsx}
+          path: ${{ matrix.folder }}
 
       - name: Setup Node.js
         if: steps.changed-files.outputs.any_changed == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
           cache-dependency-path: ${{ matrix.folder }}/package-lock.json
 
       - name: Install dependencies
