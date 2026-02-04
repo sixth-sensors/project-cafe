@@ -20,6 +20,7 @@ LED_GREEN = (0, 255, 0)
 AWAYBREW_HOST = "cafe.miarolfe.com"
 
 TELEMETRY_MSG_SCHEMA = {"type": "telemetry", "temp": 0.0}
+TELEMETRY_SEND_INTERVAL = 0.5
 
 
 def set_led_colour(colour):
@@ -83,7 +84,7 @@ def connect(wlan, networks):
 
 
 def send_msg(msg):
-    url = f"https//{AWAYBREW_HOST}/msg"
+    url = f"https//{AWAYBREW_HOST}/telemetry"
     r = urequests.post(url, data=umsgpack.dumps(msg))
     print(f"Sent: {msg}, Response: {r.status_code}")
     r.close()
@@ -185,7 +186,7 @@ def main():
         if validate_msg(telemetry_msg):
             send_msg(telemetry_msg)
 
-        time.sleep(0.5)
+        time.sleep(TELEMETRY_SEND_INTERVAL)
 
 
 if __name__ == "__main__":
