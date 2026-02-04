@@ -9,7 +9,7 @@ def read_root():
     return {"Hello": "World"}
 
 
-@app.post("/msg")
+@app.post("/telemetry")
 async def receive_msg(request: Request):
     msg = msgpack.unpackb(await request.body())
     print(f"Received: {msg}")

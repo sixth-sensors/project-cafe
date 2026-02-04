@@ -17,9 +17,7 @@ LED_RED = (255, 0, 0)
 LED_ORANGE = (255, 165, 0)
 LED_GREEN = (0, 255, 0)
 
-
-AWAYBREW_HOST = "miarolfe.com"
-AWAYBREW_PORT = 80
+AWAYBREW_HOST = "cafe.miarolfe.com"
 
 TELEMETRY_MSG_SCHEMA = {"type": "telemetry", "temp": 0.0}
 
@@ -85,7 +83,7 @@ def connect(wlan, networks):
 
 
 def send_msg(msg):
-    url = f"http://{AWAYBREW_HOST}:{AWAYBREW_PORT}/contact"
+    url = f"https//{AWAYBREW_HOST}/msg"
     r = urequests.post(url, data=umsgpack.dumps(msg))
     print(f"Sent: {msg}, Response: {r.status_code}")
     r.close()
@@ -163,7 +161,7 @@ def main():
     if connect(wlan_interface, networks):
         # Green to indicate connected
         set_led_colour(LED_GREEN)
-        ping("miarolfe.com")
+        ping(AWAYBREW_HOST)
         print("HOMEBREW is online.")
     else:
         # Red to indicate disconnected
