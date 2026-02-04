@@ -18,14 +18,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Get changed Python files
+        id: changed-files
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            **/*.py
+          path: ${{ matrix.folder }}
+
       - name: Install uv
         if: steps.changed-files.outputs.any_changed == 'true'
         uses: astral-sh/setup-uv@v5
 
-      - name: Run ruff format check
+      - name: Run ruff check
         if: steps.changed-files.outputs.any_changed == 'true'
         working-directory: ${{ matrix.folder }}
-        run: uvx ruff format --check .
+        run: uvx ruff format --check ${{ steps.changed-files.outputs.all_changed_files }}
 
   prettier:
     runs-on: ubuntu-latest
