@@ -4,6 +4,8 @@
   align-items: center;
   width: 100vw;
   height: calc(100vh - var(--header-height));
+  position: relative;
+  transition: background-color 0.3s ease;
 }
 
 .welcome-banner {
@@ -13,4 +15,11 @@
   align-items: center;
   font-size: 1.5rem;
   margin-bottom: 50px;
+}
+
+.navbar-container {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
 }
