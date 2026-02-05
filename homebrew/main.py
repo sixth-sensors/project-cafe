@@ -4,11 +4,10 @@ import time
 import ds18x20
 import machine
 import onewire
+import umsgpack
 import urequests
 from neopixel import NeoPixel
 from network import WLAN
-
-import umsgpack
 
 WIFI_SSID = "Mia"
 WIFI_PASSWORD = "password"
@@ -84,7 +83,7 @@ def connect(wlan, networks):
 
 
 def send_msg(msg):
-    url = f"https//{AWAYBREW_HOST}/telemetry"
+    url = f"https://{AWAYBREW_HOST}/telemetry"
     r = urequests.post(url, data=umsgpack.dumps(msg))
     print(f"Sent: {msg}, Response: {r.status_code}")
     r.close()
