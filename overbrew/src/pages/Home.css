@@ -1,11 +1,13 @@
 .home {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   width: 100vw;
   height: calc(100vh - var(--header-height));
   position: relative;
-  transition: background-color 0.3s ease;
+  transition: background-color 0.2s ease;
+  padding-top: 1rem;
 }
 
 .welcome-banner {
@@ -17,9 +19,45 @@
   margin-bottom: 50px;
 }
 
-.navbar-container {
-  position: absolute;
-  top: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
+.content-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 1rem;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+  height: 100%;
+}
+
+.card {
+  border-radius: 1rem;
+  box-shadow: 4px 4px 4px rgba(0, 0, 0, 0.2);
+  padding: 1rem 1.5rem;
+  background-color: var(--card-bg, #ffffff);
+  color: var(--text-color, #000000);
+}
+
+.brew-content {
+  grid-template-columns: minmax(300px, 1fr) minmax(600px, 2fr);
+}
+
+.brew-right {
+  grid-template-rows: 2fr 1fr;
+}
+
+.info-content {
+  grid-template-rows: minmax(100px, 2fr) minmax(400px, 7fr);
+}
+
+.info-bottom {
+  grid-template-columns: minmax(100px, 2fr) minmax(200px, 3fr) minmax(
+      300px,
+      6fr
+    );
 }

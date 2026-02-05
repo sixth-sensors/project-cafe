@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import Logo from '../components/logo/Logo'
+import { useState, useEffect } from 'react'
 import Navbar from '../components/navbar/Navbar'
 import { Page } from '../components/navbar/Navbar.types'
 import type { NavLink } from '../components/navbar/Navbar.types'
@@ -31,22 +30,44 @@ const Home = () => {
     },
   ]
 
-  const currentLink = links.find((link) => link.page === activePage)
-  const currentBackgroundColor =
-    currentLink?.colors.backgroundColor || 'transparent'
+  const currentColors = links.find((link) => link.page === activePage)?.colors
 
   return (
-    <main className="home" style={{ backgroundColor: currentBackgroundColor }}>
-      <div className="navbar-container">
-        <Navbar
-          activePage={activePage}
-          links={links}
-          setActivePage={setActivePage}
-        />
-      </div>
-      <div className="welcome-banner">
-        <h1>Welcome to</h1>
-        <Logo width={300} />
+    <main
+      className="home"
+      style={
+        {
+          backgroundColor: currentColors?.backgroundColor,
+          '--card-bg': currentColors?.primaryColor,
+          '--text-color': currentColors?.textColor,
+        } as React.CSSProperties
+      }
+    >
+      <Navbar
+        activePage={activePage}
+        links={links}
+        setActivePage={setActivePage}
+      />
+      <div className="content-wrapper">
+        {activePage === Page.Brew && (
+          <div className="grid brew-content">
+            <div className="card">Card 1</div>
+            <div className="grid brew-right">
+              <div className="card">Card 2</div>
+              <div className="card">Card 3</div>
+            </div>
+          </div>
+        )}
+        {activePage === Page.Info && (
+          <div className="grid info-content">
+            <div className="card">Card 1</div>
+            <div className="grid info-bottom">
+              <div className="card">Card 2</div>
+              <div className="card">Card 3</div>
+              <div className="card">Card 4</div>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   )
