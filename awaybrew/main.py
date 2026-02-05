@@ -23,7 +23,7 @@ async def receive_telemetry(request: Request):
     msg = msgpack.unpackb(await request.body())
     print(f"Received: {msg}")
 
-    if msg["ack"] == True:
+    if msg["ack"]:
         return
 
     if msg["sender_id"] != Sender.HOMEBREW:
