@@ -34,7 +34,20 @@ def read_root():
 
 @app.post("/telemetry")
 async def receive_telemetry(request: Request):
-    msg = msgpack.unpackb(await request.body(), raw=False)
+    try:
+        msg = msgpack.unpackb(await request.body(), raw=False)
+    except Exception:
+        err = {
+            "sender_id": Sender.AWAYBREW,
+            "type": "error",
+            "error": "forbidden_sender",
+        }
+        return Response(
+            content=msgpack.packb(err, use_bin_type=True),
+            status_code=400,
+            media_type="application/msgpack",
+        )
+
     print(f"Received: {msg}")
 
     if msg["type"] == "ack":
@@ -60,7 +73,20 @@ async def receive_telemetry(request: Request):
 
 @app.post("/api/brew")
 async def brew(request: Request):
-    msg = msgpack.unpackb(await request.body(), raw=False)
+    try:
+        msg = msgpack.unpackb(await request.body(), raw=False)
+    except Exception:
+        err = {
+            "sender_id": Sender.AWAYBREW,
+            "type": "error",
+            "error": "forbidden_sender",
+        }
+        return Response(
+            content=msgpack.packb(err, use_bin_type=True),
+            status_code=400,
+            media_type="application/msgpack",
+        )
+
     print(f"Received: {msg}")
 
     if msg["sender_id"] != Sender.AUTOBREW:
