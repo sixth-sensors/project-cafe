@@ -36,7 +36,7 @@ def read_root():
 async def receive_telemetry(request: Request):
     try:
         msg = msgpack.unpackb(await request.body(), raw=False)
-    except Exception as e:
+    except Exception:
         err = {
             "sender_id": Sender.AWAYBREW,
             "type": "error",
@@ -75,7 +75,7 @@ async def receive_telemetry(request: Request):
 async def brew(request: Request):
     try:
         msg = msgpack.unpackb(await request.body(), raw=False)
-    except Exception as e:
+    except Exception:
         err = {
             "sender_id": Sender.AWAYBREW,
             "type": "error",
