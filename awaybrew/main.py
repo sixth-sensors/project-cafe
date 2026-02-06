@@ -1,14 +1,28 @@
+import copy
 import sys
 from pathlib import Path
 
 import httpx
 import msgpack
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, Request, Response
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from utils.sender import Sender
 
 MCP_URL = "http://mcp-server:9000/decide"
+
+BREW_JOBS: dict[str, dict] = {}
+
+# TODO: DELETE HARDCODED DUMMY JOB
+BREW_JOBS["dummy-job"] = {
+    "state": "queued",
+    "intent": "make a coffee",
+    "plan": [
+        {"tool": "set_target_temperature", "args": {"celsius": 65}},
+        {"tool": "start_brew", "args": {}},
+    ],
+    "explanation": "Test job generated for debugging",
+}
 
 app = FastAPI()
 
@@ -20,35 +34,49 @@ def read_root():
 
 @app.post("/telemetry")
 async def receive_telemetry(request: Request):
-    msg = msgpack.unpackb(await request.body())
+    msg = msgpack.unpackb(await request.body(), raw=False)
     print(f"Received: {msg}")
 
-    if msg["ack"]:
-        return
+    if msg["type"] == "ack":
+        return Response(status_code=204)
 
     if msg["sender_id"] != Sender.HOMEBREW:
-        return Response(status_code=403, media_type="application/msgpack")
+        err = {
+            "sender_id": Sender.AWAYBREW,
+            "type": "error",
+            "error": "forbidden_sender",
+        }
+        return Response(
+            content=msgpack.packb(err, use_bin_type=True),
+            status_code=403,
+            media_type="application/msgpack",
+        )
 
     return Response(
-        content=msgpack.packb({"sender_id": Sender.AWAYBREW, "ack": True}),
+        content=msgpack.packb({"sender_id": Sender.AWAYBREW, "type": "ack"}),
         media_type="application/msgpack",
     )
 
 
 @app.post("/api/brew")
 async def brew(request: Request):
-    msg = msgpack.unpackb(await request.body())
+    msg = msgpack.unpackb(await request.body(), raw=False)
     print(f"Received: {msg}")
 
     if msg["sender_id"] != Sender.AUTOBREW:
-        return Response(status_code=403, media_type="application/msgpack")
+        err = {
+            "sender_id": Sender.AWAYBREW,
+            "type": "error",
+            "error": "forbidden_sender",
+        }
+        return Response(
+            content=msgpack.packb(err, use_bin_type=True),
+            status_code=403,
+            media_type="application/msgpack",
+        )
 
     # Hardcoded context
-    context = {
-        "devices": {
-            msg.device_id: {"online": True, "temp_c": 62.1, "last_seen_ms": 1200}
-        }
-    }
+    context = {"device": {"online": True, "temp_c": 62.1, "last_seen_ms": 1200}}
     constraints = {"max_temp_c": 90, "max_fill_percent": 90}
 
     # TODO: Decide on payload for the MCP server
@@ -62,7 +90,16 @@ async def brew(request: Request):
     async with httpx.AsyncClient(timeout=10.0) as client:
         r = await client.post(MCP_URL, json=payload)
     if r.status_code != 200:
-        raise HTTPException(status_code=502, detail="MCP server error")
+        err = {
+            "sender_id": Sender.AWAYBREW,
+            "type": "error",
+            "error": "MCP server error",
+        }
+        return Response(
+            content=msgpack.packb(err, use_bin_type=True),
+            status_code=502,
+            media_type="application/msgpack",
+        )
     decision = r.json()
 
     plan = decision.get("plan", [])
@@ -89,33 +126,35 @@ async def brew(request: Request):
 
         # TODO: enqueue into DB here
 
-    return Response(status_code=200, media_type="application/msgpack")
-
-
-BREW_JOBS: dict[str, dict] = {}
-
-# TODO: DELETE HARDCODED DUMMY JOB
-BREW_JOBS["dummy-job"] = {
-    "request_id": "classicRALFmOMENT67",
-    "state": "queued",
-    "device_id": "homebrew-1",
-    "intent": "make a coffee",
-    "plan": [
-        {"tool": "set_target_temperature", "args": {"celsius": 65}},
-        {"tool": "start_brew", "args": {}},
-    ],
-    "explanation": "Test job generated for debugging",
-}
+    res = {"sender_id": Sender.AWAYBREW, "type": "brew accepted", "plan": commands}
+    return Response(
+        content=msgpack.packb(res, use_bin_type=True),
+        status_code=200,
+        media_type="application/msgpack",
+    )
 
 
 @app.get("/api/brew/{request_id}")
 async def brew_status(request_id: str):
     job = BREW_JOBS.get(request_id)
     if not job:
-        raise HTTPException(status_code=404, detail="unknown request_id")
+        err = {
+            "sender_id": Sender.AWAYBREW,
+            "type": "error",
+            "error": "unknown request_id",
+        }
+        return Response(
+            content=msgpack.packb(err, use_bin_type=True),
+            status_code=404,
+            media_type="application/msgpack",
+        )
+
+    res = copy.deepcopy(job)
+    res["sender_id"] = Sender.AWAYBREW
+    res["type"] = "brew status"
 
     return Response(
-        content=msgpack.packb(job, use_bin_type=True),
+        content=msgpack.packb(res, use_bin_type=True),
         status_code=200,
         media_type="application/msgpack",
     )
