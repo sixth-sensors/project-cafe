@@ -4,10 +4,17 @@ import time
 import ds18x20
 import machine
 import onewire
-import umsgpack
 import urequests
 from neopixel import NeoPixel
 from network import WLAN
+
+import umsgpack
+
+
+class Sender:
+    HOMEBREW = 1
+    AWAYBREW = 2
+
 
 WIFI_SSID = "Mia"
 WIFI_PASSWORD = "password"
@@ -18,7 +25,7 @@ LED_GREEN = (0, 255, 0)
 
 AWAYBREW_HOST = "cafe.miarolfe.com"
 
-TELEMETRY_MSG_SCHEMA = {"type": "telemetry", "temp": 0.0}
+TELEMETRY_MSG_SCHEMA = {"sender_id": Sender.HOMEBREW, "type": "telemetry", "temp": 0.0}
 TELEMETRY_SEND_INTERVAL = 0.5
 
 
@@ -84,7 +91,9 @@ def connect(wlan, networks):
 
 def send_msg(msg):
     url = f"https://{AWAYBREW_HOST}/telemetry"
-    r = urequests.post(url, data=umsgpack.dumps(msg))
+    r = urequests.post(
+        url, data=umsgpack.dumps(msg), headers={"Content-Type": "application/msgpack"}
+    )
     print(f"Sent: {msg}, Response: {r.status_code}")
     r.close()
 
@@ -113,13 +122,13 @@ def ping(host, num_pings=4):
         time.sleep(1)
 
 
-def validate_msg(msg):
-    if "type" not in msg:
+def validate_msg(msg: dict):
+    if "type" not in msg.keys():
         return False
 
     def validate_telemetry_msg(telemetry_msg):
-        valid_keys = ["temp"]
-        are_keys_valid = msg.keys() == valid_keys
+        valid_keys = {"sender_id", "temp", "type"}
+        are_keys_valid = set(msg.keys()) == valid_keys
         if not are_keys_valid:
             return False
 
@@ -181,7 +190,11 @@ def main():
             for result in temp_results:
                 current_temp = temp_sensor.read_temp(result)
 
-        telemetry_msg = {"temp": current_temp}
+        telemetry_msg = {
+            "sender_id": Sender.HOMEBREW,
+            "type": "telemetry",
+            "temp": current_temp,
+        }
         if validate_msg(telemetry_msg):
             send_msg(telemetry_msg)
 
