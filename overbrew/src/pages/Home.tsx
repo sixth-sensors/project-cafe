@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Navbar from '../components/navbar/Navbar'
 import { Page } from '../components/navbar/Navbar.types'
 import type { NavLink } from '../components/navbar/Navbar.types'
@@ -49,7 +49,7 @@ const Home = () => {
         setActivePage={setActivePage}
       />
       <div className="content-wrapper">
-        {activePage === Page.Brew && (
+        {activePage === Page.Brew ? (
           <div className="grid brew-content">
             <div className="card">Card 1</div>
             <div className="grid brew-right">
@@ -57,8 +57,8 @@ const Home = () => {
               <div className="card">Card 3</div>
             </div>
           </div>
-        )}
-        {activePage === Page.Info && (
+        ) : null}
+        {activePage === Page.Info ? (
           <div className="grid info-content">
             <div className="card">Card 1</div>
             <div className="grid info-bottom">
@@ -67,7 +67,7 @@ const Home = () => {
               <div className="card">Card 4</div>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </main>
   )
