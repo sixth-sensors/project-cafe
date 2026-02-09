@@ -1,0 +1,74 @@
+.navbar-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.navbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background-color: var(--navbar-bg, #ffffff);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.1);
+  padding: 0.5rem;
+  height: 60px;
+  border-radius: 30px;
+  gap: 0.5rem;
+  transition: background-color 0.2s ease;
+}
+
+.bubble {
+  position: absolute;
+  border-radius: 22px;
+  transition: all 0.2s ease;
+  pointer-events: none;
+  top: anchor(top);
+  right: anchor(right);
+  bottom: anchor(bottom);
+  left: anchor(left);
+}
+
+.active-bubble {
+  background-color: var(--pill-bg, #e67e22);
+  z-index: 1;
+  position-anchor: --active-link;
+}
+
+.hover-bubble {
+  background-color: color-mix(in srgb, var(--pill-bg) 60%, white);
+  opacity: 0.5;
+  z-index: 2;
+  position-anchor: --navbar;
+}
+
+.navbar a {
+  position: relative;
+  z-index: 3;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-color, #5d4037);
+  font-weight: 900;
+  width: 100px;
+  height: 44px;
+  border-radius: 22px;
+  background-color: transparent;
+  transition: color 0.2s ease;
+}
+
+.navbar a:hover {
+  cursor: pointer;
+}
+
+.navbar a:hover::before {
+  content: '';
+  display: block;
+  position: absolute;
+  inset: 0;
+  anchor-name: --navbar;
+}
+
+.navbar a.active {
+  color: #fff;
+  anchor-name: --active-link;
+}
