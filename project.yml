@@ -25,7 +25,7 @@ services:
       repo: sixth-sensors/project-cafe
       branch: main
       deploy_on_push: true
-    source_dir: overbrew
+    source_dir: .
     dockerfile_path: overbrew/Dockerfile
     http_port: 80
     routes:
