@@ -5,7 +5,6 @@ export enum Page {
 export interface NavbarProps {
   links: NavLink[]
   activePage: Page
-  setActivePage: (page: Page) => void
 }
 
 export interface BubbleStyle {
