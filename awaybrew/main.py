@@ -199,19 +199,19 @@ async def brew_status(request_id: str):
 
 @app.post("/mcp")
 async def mcp_endpoint_stub(request: Request):
-    try:
-        msg = msgpack.unpackb(await request.body(), raw=False)
-    except Exception:
-        err = {
-            "sender_id": Sender.AWAYBREW,
-            "type": "error",
-            "error": "bad_msgpack",
-        }
-        return Response(
-            content=msgpack.packb(err, use_bin_type=True),
-            status_code=400,
-            media_type="application/msgpack",
-        )
+    # try:
+    #     msg = msgpack.unpackb(await request.body(), raw=False)
+    # except Exception:
+    #     err = {
+    #         "sender_id": Sender.AWAYBREW,
+    #         "type": "error",
+    #         "error": "bad_msgpack",
+    #     }
+    #     return Response(
+    #         content=msgpack.packb(err, use_bin_type=True),
+    #         status_code=400,
+    #         media_type="application/msgpack",
+    #     )
 
     res = {
         "sender_id": Sender.AWAYBREW,
