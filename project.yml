@@ -7,7 +7,7 @@ services:
   # -------------------------
   - name: project-cafe-awaybrew
     github:
-      repo: sixth-sensors/project_cafe
+      repo: sixth-sensors/project-cafe
       branch: main
       deploy_on_push: true
     source_dir: .
