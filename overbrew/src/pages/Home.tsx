@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import Navbar from '../components/navbar/Navbar'
-import { Page } from '../components/navbar/Navbar.types'
-import type { NavLink } from '../components/navbar/Navbar.types'
+import Navbar from '../components/Navbar/Navbar'
+import { Page } from '../components/Navbar/Navbar.types'
+import type { NavLink } from '../components/Navbar/Navbar.types'
 import './Home.css'
 
 const Home = () => {
