@@ -1,0 +1,33 @@
+name: project-cafe
+region: ams
+
+services:
+  # -------------------------
+  # Awaybrew
+  # -------------------------
+  - name: project-cafe-awaybrew
+    github:
+      repo: sixth-sensors/project_cafe
+      branch: main
+      deploy_on_push: true
+    source_dir: .
+    dockerfile_path: awaybrew/Dockerfile
+    http_port: 8000
+    routes:
+      - path: /
+    instance_size_slug: apps-s-1vcpu-1gb
+
+  # -------------------------
+  # Overbrew
+  # -------------------------
+  - name: project-cafe-overbrew
+    github:
+      repo: sixth-sensors/project_cafe
+      branch: main
+      deploy_on_push: true
+    source_dir: overbrew
+    dockerfile_path: Dockerfile
+    http_port: 80
+    routes:
+      - path: /project-cafe-overbrew
+    instance_size_slug: apps-s-1vcpu-1gb

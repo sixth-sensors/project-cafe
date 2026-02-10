@@ -1,15 +1,11 @@
 import copy
-import sys
-from pathlib import Path
 
 import httpx
 import msgpack
 from fastapi import FastAPI, Request, Response
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from utils.sender import Sender
 
-MCP_URL = "http://mcp-server:9000/decide"
+MCP_URL = "https://cafe.miarolfe.com/mcp"
 
 BREW_JOBS: dict[str, dict] = {}
 
@@ -66,7 +62,9 @@ async def receive_telemetry(request: Request):
         )
 
     return Response(
-        content=msgpack.packb({"sender_id": Sender.AWAYBREW, "type": "ack"}),
+        content=msgpack.packb(
+            {"sender_id": Sender.AWAYBREW, "type": "ack"}, use_bin_type=True
+        ),
         media_type="application/msgpack",
     )
 
@@ -114,7 +112,15 @@ async def brew(request: Request):
     }
 
     async with httpx.AsyncClient(timeout=10.0) as client:
-        r = await client.post(MCP_URL, json=payload)
+        # r = await client.post(MCP_URL, json=payload)
+        r = await client.post(
+            MCP_URL,
+            content=msgpack.packb(payload, use_bin_type=True),
+            headers={
+                "Content-Type": "application/msgpack",
+                "Accept": "application/msgpack",
+            },
+        )
     if r.status_code != 200:
         err = {
             "sender_id": Sender.AWAYBREW,
@@ -126,7 +132,7 @@ async def brew(request: Request):
             status_code=502,
             media_type="application/msgpack",
         )
-    decision = r.json()
+    decision = msgpack.unpackb(r.content, raw=False)
 
     plan = decision.get("plan", [])
 
@@ -182,5 +188,37 @@ async def brew_status(request_id: str):
     return Response(
         content=msgpack.packb(res, use_bin_type=True),
         status_code=200,
+        media_type="application/msgpack",
+    )
+
+
+#####################
+# AUTOBREW ENDPOINTS
+#####################
+
+
+@app.post("/mcp")
+async def mcp_endpoint_stub(request: Request):
+    try:
+        msg = msgpack.unpackb(await request.body(), raw=False)
+    except Exception:
+        err = {
+            "sender_id": Sender.AWAYBREW,
+            "type": "error",
+            "error": "bad_msgpack",
+        }
+        return Response(
+            content=msgpack.packb(err, use_bin_type=True),
+            status_code=400,
+            media_type="application/msgpack",
+        )
+
+    res = {
+        "sender_id": Sender.AWAYBREW,
+        "type": "ack",
+        "plan": [],
+    }
+    return Response(
+        content=msgpack.packb(res, use_bin_type=True),
         media_type="application/msgpack",
     )

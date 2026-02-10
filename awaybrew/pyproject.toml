@@ -8,8 +8,12 @@ dependencies = [
     "fastapi>=0.128.0",
     "msgpack>=1.1.2",
     "uvicorn[standard]>=0.40.0",
-    "httpx >= 0.28.1"
+    "httpx >= 0.28.1",
+    "project-cafe-utils",
 ]
+
+[tool.uv.sources]
+project-cafe-utils = { path = "../utils", editable = true }
 
 [dependency-groups]
 dev = [
