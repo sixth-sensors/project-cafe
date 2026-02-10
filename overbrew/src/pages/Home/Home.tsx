@@ -60,10 +60,7 @@ const Home = () => {
       }
     >
       <div className="navbar-container">
-        <Navbar
-          activePage={activePage}
-          links={links}
-        />
+        <Navbar activePage={activePage} links={links} />
       </div>
       <div className="content-wrapper">
         <div

@@ -15,13 +15,6 @@ const LineChart = ({ data, target }: { data: ChartData; target?: number }) => {
 
   return (
     <LineChartRe
-      style={{
-        width: '100%',
-        maxWidth: '700px',
-        height: '100%',
-        maxHeight: '70vh',
-      }}
-      responsive
       data={data}
       margin={{
         top: 20,
@@ -29,22 +22,27 @@ const LineChart = ({ data, target }: { data: ChartData; target?: number }) => {
         left: 5,
         bottom: 5,
       }}
+      responsive
+      style={{
+        width: '100%',
+        maxWidth: '700px',
+        height: '100%',
+        maxHeight: '70vh',
+      }}
     >
-      <CartesianGrid strokeDasharray="3 3" stroke="#cccccc" opacity={0.5} />
+      <CartesianGrid opacity={0.5} stroke="#cccccc" strokeDasharray="3 3" />
       <XAxis
-        dataKey="time"
-        stroke="var(--dark-brown)"
-        tick={{ fontSize: 12 }}
         angle={-45}
-        textAnchor="end"
+        dataKey="time"
         height={60}
         interval="preserveStartEnd"
         minTickGap={30}
+        stroke="var(--dark-brown)"
+        textAnchor="end"
+        tick={{ fontSize: 12 }}
       />
       <YAxis
-        width="auto"
-        stroke="var(--dark-brown)"
-        tick={{ fontSize: 12 }}
+        domain={[0, target ? target + 10 : 'dataMax + 10']}
         label={{
           value: 'Temperature (°C)',
           angle: -90,
@@ -52,9 +50,11 @@ const LineChart = ({ data, target }: { data: ChartData; target?: number }) => {
           style: { textAnchor: 'middle' },
           fill: 'var(--dark-brown)',
         }}
-        domain={[0, target ? target + 10 : 'dataMax + 10']}
-        tickFormatter={formatTemperature}
+        stroke="var(--dark-brown)"
+        tick={{ fontSize: 12 }}
         tickCount={6}
+        tickFormatter={formatTemperature}
+        width="auto"
       />
       <Tooltip
         formatter={(value: number | undefined) =>
@@ -64,8 +64,7 @@ const LineChart = ({ data, target }: { data: ChartData; target?: number }) => {
         }
       />
       <Legend />
-      {target !== undefined && (
-        <ReferenceLine
+      {target !== undefined ? <ReferenceLine
           label={{
             value: `Target: ${formatTemperature(target)}`,
             position: 'insideTopRight',
@@ -73,20 +72,19 @@ const LineChart = ({ data, target }: { data: ChartData; target?: number }) => {
             fill: 'var(--dark-brown)',
             dy: 5,
           }}
-          y={target}
-          strokeWidth={2}
           stroke="var(--light-brown)"
           strokeDasharray="5 5"
-        />
-      )}
+          strokeWidth={2}
+          y={target}
+        /> : null}
       <Line
-        type="linear"
+        activeDot={{ r: 6 }}
         dataKey="temperature"
+        dot={{ r: 3 }}
+        name="Temperature"
         stroke="var(--dark-orange)"
         strokeWidth={2}
-        dot={{ r: 3 }}
-        activeDot={{ r: 6 }}
-        name="Temperature"
+        type="linear"
       />
     </LineChartRe>
   )
