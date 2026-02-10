@@ -1,0 +1,43 @@
+.grid {
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.card {
+  border-radius: 1rem;
+  box-shadow: 4px 4px 4px rgba(0, 0, 0, 0.2);
+  padding: 1rem 1.5rem;
+}
+
+.brew-content {
+  grid-template-columns: minmax(300px, 1fr) minmax(600px, 2fr);
+
+  & .card {
+    background-color: var(--dark-brown);
+    color: var(--cream);
+  }
+}
+
+.brew-right {
+  grid-template-rows: 2fr 1fr;
+}
+
+.info-content {
+  grid-template-rows: minmax(100px, 2fr) minmax(400px, 7fr);
+
+  & .card {
+    background-color: #ffffff;
+    color: var(--dark-brown);
+  }
+}
+
+.info-bottom {
+  grid-template-columns: minmax(100px, 2fr) minmax(200px, 3fr) minmax(
+      300px,
+      6fr
+    );
+}

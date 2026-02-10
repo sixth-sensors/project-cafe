@@ -1,15 +1,9 @@
-import type { MouseEvent } from 'react'
-import type { Page, NavbarProps } from './Navbar.types'
+import type { NavbarProps } from './Navbar.types'
 import './Navbar.css'
 
-const Navbar = ({ links, activePage, setActivePage }: NavbarProps) => {
+const Navbar = ({ links, activePage }: NavbarProps) => {
   const currentColors =
     links.find((link) => link.page === activePage)?.colors ?? links[0]?.colors
-
-  const handleClick = (e: MouseEvent<HTMLAnchorElement>, page: Page) => {
-    e.preventDefault()
-    setActivePage(page)
-  }
 
   return (
     <div
@@ -29,9 +23,8 @@ const Navbar = ({ links, activePage, setActivePage }: NavbarProps) => {
         {links.map((link) => (
           <a
             className={activePage === link.page ? 'active' : ''}
-            href="#"
+            href={`#${link.page}`}
             key={link.page}
-            onClick={(e) => handleClick(e, link.page)}
           >
             {link.label}
           </a>
