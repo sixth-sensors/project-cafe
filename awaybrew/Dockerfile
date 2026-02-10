@@ -13,8 +13,7 @@ COPY utils/ ./utils/
 WORKDIR /app/awaybrew
 RUN uv sync --frozen --no-dev
 
-COPY awaybrew/ ./awaybrew/
+COPY awaybrew/ ./
 
 EXPOSE 8000
-
 CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
