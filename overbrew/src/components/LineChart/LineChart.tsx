@@ -64,7 +64,8 @@ const LineChart = ({ data, target }: { data: ChartData; target?: number }) => {
         }
       />
       <Legend />
-      {target !== undefined ? <ReferenceLine
+      {target !== undefined ? (
+        <ReferenceLine
           label={{
             value: `Target: ${formatTemperature(target)}`,
             position: 'insideTopRight',
@@ -76,7 +77,8 @@ const LineChart = ({ data, target }: { data: ChartData; target?: number }) => {
           strokeDasharray="5 5"
           strokeWidth={2}
           y={target}
-        /> : null}
+        />
+      ) : null}
       <Line
         activeDot={{ r: 6 }}
         dataKey="temperature"
