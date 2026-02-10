@@ -1,0 +1,5 @@
+export const TARGET_TEMPERATURE = 95.0
+export const ROOM_TEMPERATURE = 21.0
+export const TARGET_THRESHOLD = 3.0
+
+export const NUM_TEMPERATURE_POINTS = 100
