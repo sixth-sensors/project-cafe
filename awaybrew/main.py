@@ -1,6 +1,6 @@
 import copy
+import uuid
 
-import httpx
 import msgpack
 from fastapi import FastAPI, Request, Response
 from utils.sender import Sender
@@ -28,8 +28,23 @@ def read_root():
     return {"Hello": "World"}
 
 
+#####################
+# HOMEBREW ENDPOINTS
+#####################
+
+
 @app.post("/telemetry")
 async def receive_telemetry(request: Request):
+    """
+    Receives telemetry data from Homebrew. Returns an ACK response.
+
+    Expected packet format:
+    {
+        "sender_id" : Sender.HOMEBREW
+        "type" : "telemetry",
+        <READINGS>
+    }
+    """
     try:
         msg = msgpack.unpackb(await request.body(), raw=False)
     except Exception:
@@ -44,12 +59,12 @@ async def receive_telemetry(request: Request):
             media_type="application/msgpack",
         )
 
-    print(f"Received: {msg}")
+    print(f"Telemetry received: {msg}")
 
     if msg["type"] == "ack":
         return Response(status_code=204)
 
-    if msg["sender_id"] != Sender.HOMEBREW:
+    if msg["sender_id"] != Sender.HOMEBREW or msg["type"] != "telemetry":
         err = {
             "sender_id": Sender.AWAYBREW,
             "type": "error",
@@ -61,6 +76,9 @@ async def receive_telemetry(request: Request):
             media_type="application/msgpack",
         )
 
+    # TODO: We should modify this response to contain physical instructions for
+    # Homebrew to take, given the telemetry readings.
+
     return Response(
         content=msgpack.packb(
             {"sender_id": Sender.AWAYBREW, "type": "ack"}, use_bin_type=True
@@ -69,8 +87,25 @@ async def receive_telemetry(request: Request):
     )
 
 
-@app.post("/api/brew")
+#####################
+# OVERBREW ENDPOINTS
+#####################
+
+
+@app.post("/brew")
 async def brew(request: Request):
+    """
+    Receives a brew request from Overbrew. Returns "brew accepted" or error messages when applicable.
+    If Overbrew requests that a profile is created, this function will populate Databrew with the new profile.
+
+    Expected packet format:
+    {
+        "sender_id" : Sender.OVERBREW,
+        "type" : "brew",
+        "create_profile" : True | False,
+        "intent" : <Intent for the MCP server>
+    }
+    """
     try:
         msg = msgpack.unpackb(await request.body(), raw=False)
     except Exception:
@@ -87,7 +122,7 @@ async def brew(request: Request):
 
     print(f"Received: {msg}")
 
-    if msg["sender_id"] != Sender.AUTOBREW:
+    if msg["sender_id"] != Sender.OVERBREW or msg["type"] != "brew":
         err = {
             "sender_id": Sender.AWAYBREW,
             "type": "error",
@@ -104,61 +139,30 @@ async def brew(request: Request):
     constraints = {"max_temp_c": 90, "max_fill_percent": 90}
 
     # TODO: Decide on payload for the MCP server
-    payload = {
+    _ = {
         "sender_id": Sender.AWAYBREW,
         "intent": msg["intent"],
         "context": context,
         "constraints": constraints,
     }
+    #####
+    # TODO: the above dictionary will be sent to the MCP server at some point.
+    #####
+    #
+    commands = []  # List of commands that will be taken by the brew.
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        # r = await client.post(MCP_URL, json=payload)
-        r = await client.post(
-            MCP_URL,
-            content=msgpack.packb(payload, use_bin_type=True),
-            headers={
-                "Content-Type": "application/msgpack",
-                "Accept": "application/msgpack",
-            },
-        )
-    if r.status_code != 200:
-        err = {
-            "sender_id": Sender.AWAYBREW,
-            "type": "error",
-            "error": "MCP server error",
-        }
-        return Response(
-            content=msgpack.packb(err, use_bin_type=True),
-            status_code=502,
-            media_type="application/msgpack",
-        )
-    decision = msgpack.unpackb(r.content, raw=False)
+    # TODO: enqueue into DB here
+    if msg["create_profile"]:
+        pass
 
-    plan = decision.get("plan", [])
+    request_id = uuid.uuid4().int
 
-    allowed = {"set_target_temperature", "set_fill_percent", "start_brew", "stop"}
-    commands = []
-    for step in plan:
-        tool = step.get("tool")
-        args = step.get("args", {})
-        if tool not in allowed:
-            continue
-
-        if tool == "set_target_temperature":
-            c = args.get("celsius")
-            if not isinstance(c, (int, float)) or c > constraints["max_temp_c"]:
-                continue
-
-        if tool == "set_fill_percent":
-            p = args.get("percent")
-            if not isinstance(p, (int, float)) or p > constraints["max_fill_percent"]:
-                continue
-
-        commands.append({"tool": tool, "args": args})
-
-        # TODO: enqueue into DB here
-
-    res = {"sender_id": Sender.AWAYBREW, "type": "brew accepted", "plan": commands}
+    res = {
+        "sender_id": Sender.AWAYBREW,
+        "type": "brew accepted",
+        "request_id": request_id,
+        "plan": commands,
+    }
     return Response(
         content=msgpack.packb(res, use_bin_type=True),
         status_code=200,
@@ -166,8 +170,26 @@ async def brew(request: Request):
     )
 
 
+#####################
+# AUTOBREW ENDPOINTS
+#####################
+
+
 @app.get("/api/brew/{request_id}")
 async def brew_status(request_id: str):
+    """
+    Takes the status of a brew job via a GET request.
+
+    Input: request ID.
+
+    Returns:
+    {
+        "sender_id" : Sender.AWAYBREW
+        "type" : "brew status",
+        "request_id" : <REQUEST ID>
+    }
+    """
+
     job = BREW_JOBS.get(request_id)
     if not job:
         err = {
@@ -192,27 +214,9 @@ async def brew_status(request_id: str):
     )
 
 
-#####################
-# AUTOBREW ENDPOINTS
-#####################
-
-
+# TODO: check if this is even neccessary. Could be that the other functions work just fine.
 @app.post("/mcp")
 async def mcp_endpoint_stub(request: Request):
-    # try:
-    #     msg = msgpack.unpackb(await request.body(), raw=False)
-    # except Exception:
-    #     err = {
-    #         "sender_id": Sender.AWAYBREW,
-    #         "type": "error",
-    #         "error": "bad_msgpack",
-    #     }
-    #     return Response(
-    #         content=msgpack.packb(err, use_bin_type=True),
-    #         status_code=400,
-    #         media_type="application/msgpack",
-    #     )
-
     res = {
         "sender_id": Sender.AWAYBREW,
         "type": "ack",
