@@ -5,7 +5,7 @@ import './Login.css'
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SubmitEvent) => {
     e.preventDefault()
     alert('Login submitted. TODO add logic.')
     // TODO: Add login logic here

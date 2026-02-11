@@ -7,7 +7,7 @@ import Info from './Grids/Info'
 import './Home.css'
 
 const getPageFromHash = (): Page => {
-  const hash = window.location.hash.slice(1) // Remove the '#'
+  const hash = window.location.hash.slice(1)
   return hash === 'info' ? Page.Info : Page.Brew
 }
 
