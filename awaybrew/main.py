@@ -1,8 +1,8 @@
 import copy
 import uuid
 
-import msgpack
 from fastapi import FastAPI, Request, Response
+from utils.packet import Packet
 from utils.sender import Sender
 
 MCP_URL = "https://cafe.miarolfe.com/mcp"
@@ -46,17 +46,10 @@ async def receive_telemetry(request: Request):
     }
     """
     try:
-        msg = msgpack.unpackb(await request.body(), raw=False)
+        msg = await Packet.request_to_dict(request)
     except Exception:
-        err = {
-            "sender_id": Sender.AWAYBREW,
-            "type": "error",
-            "error": "forbidden_sender",
-        }
-        return Response(
-            content=msgpack.packb(err, use_bin_type=True),
-            status_code=400,
-            media_type="application/msgpack",
+        return Packet.error(Sender.AWAYBREW, "invalid_message").to_response(
+            status_code=400
         )
 
     print(f"Telemetry received: {msg}")
@@ -65,26 +58,14 @@ async def receive_telemetry(request: Request):
         return Response(status_code=204)
 
     if msg["sender_id"] != Sender.HOMEBREW or msg["type"] != "telemetry":
-        err = {
-            "sender_id": Sender.AWAYBREW,
-            "type": "error",
-            "error": "forbidden_sender",
-        }
-        return Response(
-            content=msgpack.packb(err, use_bin_type=True),
-            status_code=403,
-            media_type="application/msgpack",
+        return Packet.error(Sender.AWAYBREW, "forbidden_sender").to_response(
+            status_code=403
         )
 
     # TODO: We should modify this response to contain physical instructions for
     # Homebrew to take, given the telemetry readings.
 
-    return Response(
-        content=msgpack.packb(
-            {"sender_id": Sender.AWAYBREW, "type": "ack"}, use_bin_type=True
-        ),
-        media_type="application/msgpack",
-    )
+    return Packet.ack(Sender.AWAYBREW).to_response()
 
 
 #####################
@@ -107,31 +88,17 @@ async def brew(request: Request):
     }
     """
     try:
-        msg = msgpack.unpackb(await request.body(), raw=False)
+        msg = await Packet.request_to_dict(request)
     except Exception:
-        err = {
-            "sender_id": Sender.AWAYBREW,
-            "type": "error",
-            "error": "forbidden_sender",
-        }
-        return Response(
-            content=msgpack.packb(err, use_bin_type=True),
-            status_code=400,
-            media_type="application/msgpack",
+        return Packet.error(Sender.AWAYBREW, "invalid_message").to_response(
+            status_code=400
         )
 
     print(f"Received: {msg}")
 
     if msg["sender_id"] != Sender.OVERBREW or msg["type"] != "brew":
-        err = {
-            "sender_id": Sender.AWAYBREW,
-            "type": "error",
-            "error": "forbidden_sender",
-        }
-        return Response(
-            content=msgpack.packb(err, use_bin_type=True),
-            status_code=403,
-            media_type="application/msgpack",
+        return Packet.error(Sender.AWAYBREW, "invalid_message").to_response(
+            status_code=400
         )
 
     # Hardcoded context
@@ -148,26 +115,20 @@ async def brew(request: Request):
     #####
     # TODO: the above dictionary will be sent to the MCP server at some point.
     #####
-    #
+
     commands = []  # List of commands that will be taken by the brew.
+
+    request_id = uuid.uuid4().int
 
     # TODO: enqueue into DB here
     if msg["create_profile"]:
         pass
 
-    request_id = uuid.uuid4().int
-
     res = {
-        "sender_id": Sender.AWAYBREW,
-        "type": "brew accepted",
         "request_id": request_id,
         "plan": commands,
     }
-    return Response(
-        content=msgpack.packb(res, use_bin_type=True),
-        status_code=200,
-        media_type="application/msgpack",
-    )
+    return Packet(Sender.AWAYBREW, "brew accepted", res).to_response()
 
 
 #####################
@@ -192,37 +153,16 @@ async def brew_status(request_id: str):
 
     job = BREW_JOBS.get(request_id)
     if not job:
-        err = {
-            "sender_id": Sender.AWAYBREW,
-            "type": "error",
-            "error": "unknown request_id",
-        }
-        return Response(
-            content=msgpack.packb(err, use_bin_type=True),
-            status_code=404,
-            media_type="application/msgpack",
+        return Packet.error(Sender.AWAYBREW, "unknown_request_id").to_response(
+            status_code=404
         )
 
     res = copy.deepcopy(job)
-    res["sender_id"] = Sender.AWAYBREW
-    res["type"] = "brew status"
 
-    return Response(
-        content=msgpack.packb(res, use_bin_type=True),
-        status_code=200,
-        media_type="application/msgpack",
-    )
+    return Packet(Sender.AWAYBREW, "brew status", res).to_response()
 
 
 # TODO: check if this is even neccessary. Could be that the other functions work just fine.
 @app.post("/mcp")
 async def mcp_endpoint_stub(request: Request):
-    res = {
-        "sender_id": Sender.AWAYBREW,
-        "type": "ack",
-        "plan": [],
-    }
-    return Response(
-        content=msgpack.packb(res, use_bin_type=True),
-        media_type="application/msgpack",
-    )
+    return Packet.ack(Sender.AWAYBREW).to_response()
