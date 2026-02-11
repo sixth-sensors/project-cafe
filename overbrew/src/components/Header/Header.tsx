@@ -1,27 +1,28 @@
+import { Link } from 'react-router-dom'
 import './Header.css'
 import Logo from '../Logo/Logo'
 
 const Header = () => {
   return (
     <header className="header">
-      <a className="header-logo" href="/">
+      <Link className="header-logo" to="/">
         <Logo
           beanColor="var(--dark-brown)"
           textColor="var(--cream)"
           width={150}
         />
-      </a>
+      </Link>
       <nav className="header-nav">
         <ul className="header-nav-list">
           <li>
-            <a className="header-nav-link" href="/">
+            <Link className="header-nav-link" to="/">
               Home
-            </a>
+            </Link>
           </li>
           <li>
-            <a className="header-nav-link" href="/login">
+            <Link className="header-nav-link" to="/login">
               Login
-            </a>
+            </Link>
           </li>
         </ul>
       </nav>

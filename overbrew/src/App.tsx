@@ -5,7 +5,7 @@ import Login from './pages/Login/Login'
 
 const App = () => {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/overbrew">
       <Header />
       <Routes>
         <Route element={<Home />} path="/" />
