@@ -136,7 +136,7 @@ async def brew(request: Request):
 #####################
 
 
-@app.get("/api/brew/{request_id}")
+@app.get("/brew/{request_id}")
 async def brew_status(request_id: str):
     """
     Takes the status of a brew job via a GET request.

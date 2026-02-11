@@ -18,3 +18,9 @@ CS7NS2 - Internet of Things group project
 ### `overbrew`: Web front-end and control panel
 
 [`overbrew` README](overbrew/README.md)
+
+## Infrastructure deployment
+to update the deployment from the project.yml file, run:
+```bash
+doctl apps update <DIGITALOCEAN_APP_ID> --spec project.yml --update-sources
+```
