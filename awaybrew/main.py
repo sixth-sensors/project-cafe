@@ -1,5 +1,4 @@
 import copy
-import uuid
 
 from fastapi import FastAPI, Request, Response
 from utils.packet import Packet
