@@ -15,7 +15,7 @@ class Packet:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "sender_id": self.sender_id,
+            "sender_id": int(self.sender_id),
             "type": self.type,
             **self.payload,
         }
