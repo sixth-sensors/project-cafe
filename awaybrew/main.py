@@ -118,7 +118,7 @@ async def brew(request: Request):
 
     commands = []  # List of commands that will be taken by the brew.
 
-    request_id = uuid.uuid4().int
+    request_id = str(uuid.uuid4())
 
     # TODO: enqueue into DB here
     if msg["create_profile"]:
