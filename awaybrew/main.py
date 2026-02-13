@@ -1,4 +1,5 @@
 import copy
+import uuid
 
 from fastapi import FastAPI, Request, Response
 from utils.packet import Packet
@@ -117,7 +118,7 @@ async def brew(request: Request):
 
     commands = []  # List of commands that will be taken by the brew.
 
-    request_id = "request_id_goes_here"
+    request_id = str(uuid.uuid4())
 
     # TODO: enqueue into DB here
     if msg["create_profile"]:
