@@ -46,6 +46,11 @@ const Account = () => {
     <main className="account">
       <h1>Account</h1>
       <section className="account-section">
+        <h2>Email</h2>
+        <p className="account-email">{user?.email}</p>
+      </section>
+
+      <section className="account-section">
         <h2>Profile picture</h2>
         <div className="account-avatar-preview">
           <img
@@ -71,13 +76,8 @@ const Account = () => {
           {photoSuccess ? (
             <p className="account-success">Profile picture updated.</p>
           ) : null}
-          <button type="submit">Save</button>
+          <button type="submit">Update Photo</button>
         </form>
-      </section>
-
-      <section className="account-section">
-        <h2>Email</h2>
-        <p className="account-email">{user?.email}</p>
       </section>
 
       <section className="account-section">
