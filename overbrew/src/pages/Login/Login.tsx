@@ -46,12 +46,6 @@ const Login = () => {
     }
   }
 
-  useEffect(() => {
-    if (user) {
-      console.log('User logged in:', user)
-    }
-  }, [user])
-
   return (
     <main className="login">
       <h1>Login</h1>
