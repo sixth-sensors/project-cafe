@@ -50,8 +50,8 @@ const PasswordReset = () => {
       ) : (
         <>
           <p>
-            Forgotten your password? Enter your email below and we'll send you a
-            password reset email.
+            Forgotten your password? Enter your email below and we&apos;ll send
+            you a password reset email.
           </p>
           <form className="password-reset-form" onSubmit={handleSubmit}>
             <Input

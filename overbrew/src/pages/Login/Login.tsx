@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import Input from '../../components/Input/Input'
 import { signInWithEmail } from '../../firebase'
-import { useAuth } from '../../hooks/useAuth'
 import './Login.css'
 
 interface FieldErrors {
@@ -15,8 +14,6 @@ const Login = () => {
   const [password, setPassword] = useState('')
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [error, setError] = useState<string | null>(null)
-
-  const { user } = useAuth()
 
   const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault()
