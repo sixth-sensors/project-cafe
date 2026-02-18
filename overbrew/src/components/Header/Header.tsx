@@ -1,8 +1,12 @@
 import { Link } from 'react-router-dom'
-import './Header.css'
+import { useAuth } from '../../hooks/useAuth'
 import Logo from '../Logo/Logo'
+import UserAvatar from '../UserAvatar/UserAvatar'
+import './Header.css'
 
 const Header = () => {
+  const { user } = useAuth()
+
   return (
     <header className="header">
       <Link className="header-logo" to="/">
@@ -20,9 +24,13 @@ const Header = () => {
             </Link>
           </li>
           <li>
-            <Link className="header-nav-link" to="/login">
-              Login
-            </Link>
+            {user ? (
+              <UserAvatar user={user} />
+            ) : (
+              <Link className="header-nav-link" to="/login">
+                Login
+              </Link>
+            )}
           </li>
         </ul>
       </nav>

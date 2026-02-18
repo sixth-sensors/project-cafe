@@ -1,4 +1,4 @@
-.login {
+.signup {
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -7,7 +7,7 @@
   padding: 2rem;
 }
 
-.login-form {
+.signup-form {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;

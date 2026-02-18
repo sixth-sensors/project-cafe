@@ -1,0 +1,55 @@
+.avatar-btn {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  anchor-name: --avatar-btn;
+}
+
+.avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  border: 0.2rem solid var(--cream);
+  background-color: white;
+}
+
+.avatar-dropdown {
+  position: fixed;
+  inset: unset;
+  text-align: right;
+  position-anchor: --avatar-btn;
+  top: calc(anchor(bottom) + 0.5rem);
+  right: anchor(right);
+  margin: 0;
+  overflow: visible;
+  border-radius: 0.25rem;
+  border: 1px solid var(--dark-brown);
+
+  & .avatar-dropdown-email {
+    color: var(--dark-brown);
+    font-weight: 600;
+    padding-bottom: 0.4rem;
+    margin-bottom: 0.4rem;
+    border-bottom: 1px solid var(--dark-brown);
+    cursor: default;
+  }
+
+  & ul {
+    padding: 0.5rem;
+  }
+
+  & a,
+  li {
+    color: var(--dark-brown);
+    display: block;
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  & a:hover {
+    color: var(--dark-orange);
+  }
+}
