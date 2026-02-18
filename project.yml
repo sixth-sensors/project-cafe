@@ -29,5 +29,5 @@ services:
     dockerfile_path: Dockerfile
     http_port: 80
     routes:
-      - path: /project-cafe-overbrew
+      - path: /overbrew
     instance_size_slug: apps-s-1vcpu-1gb
