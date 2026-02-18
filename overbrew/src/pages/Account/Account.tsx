@@ -87,11 +87,11 @@ const Account = () => {
         {resetError ? <p className="account-error">{resetError}</p> : null}
         {resetSent ? (
           <p className="account-success">
-            Reset email sent — check your inbox.
+            Password reset email sent - check your inbox.
           </p>
         ) : null}
         <button onClick={handlePasswordReset} type="button">
-          Send password reset email
+          Reset Password
         </button>
       </section>
     </main>

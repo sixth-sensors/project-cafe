@@ -69,11 +69,11 @@
 }
 
 .account-error {
-  color: var(--error);
+  color: var(--error) !important;
   font-size: 0.875rem;
 }
 
 .account-success {
-  color: #2a7a2a;
+  color: var(--success) !important;
   font-size: 0.875rem;
 }
