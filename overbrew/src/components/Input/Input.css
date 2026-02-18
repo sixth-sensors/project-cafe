@@ -18,6 +18,15 @@
     outline: none;
     border-color: var(--dark-orange);
   }
+
+  & input.input-error {
+    border-color: #cc0000;
+  }
+
+  & .input-error-msg {
+    color: #cc0000;
+    font-size: 0.85rem;
+  }
 }
 
 .password-input-wrapper {

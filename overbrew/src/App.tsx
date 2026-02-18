@@ -5,6 +5,7 @@ import PublicOnlyRoute from './components/PublicOnlyRoute/PublicOnlyRoute'
 import Home from './pages/Home/Home'
 import Login from './pages/Login/Login'
 import Signup from './pages/Signup/Signup'
+import Account from './pages/Account/Account'
 
 const App = () => {
   return (
@@ -13,6 +14,7 @@ const App = () => {
       <Routes>
         <Route element={<ProtectedRoute />}>
           <Route element={<Home />} path="/" />
+          <Route element={<Account />} path="/account" />
         </Route>
         <Route element={<PublicOnlyRoute />}>
           <Route element={<Login />} path="/login" />

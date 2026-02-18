@@ -5,9 +5,15 @@ import { signInWithEmail } from '../../firebase'
 import { useAuth } from '../../hooks/useAuth'
 import './Login.css'
 
+interface FieldErrors {
+  email?: string
+  password?: string
+}
+
 const Login = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [error, setError] = useState<string | null>(null)
 
   const { user } = useAuth()
@@ -15,6 +21,21 @@ const Login = () => {
   const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault()
     setError(null)
+
+    const errors: FieldErrors = {}
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      errors.email = 'Please enter a valid email address.'
+    }
+
+    if (password.length < 8) {
+      errors.password = 'Password must be at least 8 characters.'
+    }
+
+    setFieldErrors(errors)
+    if (Object.keys(errors).length > 0) return
+
     try {
       await signInWithEmail(email, password)
     } catch (error) {
@@ -36,15 +57,16 @@ const Login = () => {
       <h1>Login</h1>
       <form className="login-form" onSubmit={handleSubmit}>
         <Input
+          error={fieldErrors.email}
           id="email"
           label="Email"
           name="email"
           onChange={setEmail}
           required
-          type="email"
           value={email}
         />
         <Input
+          error={fieldErrors.password}
           id="password"
           isPassword
           label="Password"
