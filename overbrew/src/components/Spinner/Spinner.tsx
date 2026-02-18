@@ -1,5 +1,5 @@
 import './Spinner.css'
 
-const Spinner = () => <div className="spinner" aria-label="Loading" />
+const Spinner = () => <div aria-label="Loading" className="spinner" />
 
 export default Spinner

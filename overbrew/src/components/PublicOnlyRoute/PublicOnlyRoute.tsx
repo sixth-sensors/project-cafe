@@ -7,7 +7,7 @@ const PublicOnlyRoute = () => {
 
   if (loading) return <Spinner />
 
-  return user ? <Navigate to="/" replace /> : <Outlet />
+  return user ? <Navigate replace to="/" /> : <Outlet />
 }
 
 export default PublicOnlyRoute

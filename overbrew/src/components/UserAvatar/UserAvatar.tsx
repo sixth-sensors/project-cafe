@@ -10,18 +10,19 @@ const UserAvatar = ({ user }: { user: User }) => {
   return (
     <>
       <button
+        aria-label="User menu"
         className="avatar-btn"
         popoverTarget="avatar-dropdown"
-        aria-label="User menu"
+        type="button"
       >
         <img
-          className="avatar"
-          src={user.photoURL ?? 'avatar.png'}
           alt={user.displayName ?? 'Profile picture'}
+          className="avatar"
           referrerPolicy="no-referrer"
+          src={user.photoURL ?? 'avatar.png'}
         />
       </button>
-      <nav id="avatar-dropdown" className="avatar-dropdown" popover="auto">
+      <nav className="avatar-dropdown" id="avatar-dropdown" popover="auto">
         <ul>
           <li className="avatar-dropdown-email">{user.email}</li>
           <li>

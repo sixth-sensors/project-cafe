@@ -21,32 +21,32 @@ const Signup = () => {
       <form className="signup-form" onSubmit={handleSubmit}>
         <Input
           id="email"
-          name="email"
           label="Email"
-          type="email"
-          value={email}
+          name="email"
           onChange={setEmail}
           required
+          type="email"
+          value={email}
         />
         <Input
           id="password"
-          name="password"
-          label="Password"
-          value={password}
-          onChange={setPassword}
           isPassword
+          label="Password"
+          name="password"
+          onChange={setPassword}
           required
+          value={password}
         />
         <Input
           id="confirm-password"
-          name="confirm-password"
-          label="Confirm Password"
-          value={confirmPassword}
-          onChange={setConfirmPassword}
           isPassword
+          label="Confirm Password"
+          name="confirm-password"
+          onChange={setConfirmPassword}
           required
+          value={confirmPassword}
         />
-        {error && <p className="error">{error}</p>}
+        {error ? <p className="error">{error}</p> : null}
         <button type="submit">Sign Up</button>
         <p className="auth-link">
           Already have an account? <Link to="/login">Log in</Link>

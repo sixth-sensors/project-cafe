@@ -37,26 +37,26 @@ const Login = () => {
       <form className="login-form" onSubmit={handleSubmit}>
         <Input
           id="email"
-          name="email"
           label="Email"
-          type="email"
-          value={email}
+          name="email"
           onChange={setEmail}
           required
+          type="email"
+          value={email}
         />
         <Input
           id="password"
-          name="password"
-          label="Password"
-          value={password}
-          onChange={setPassword}
           isPassword
+          label="Password"
+          name="password"
+          onChange={setPassword}
           required
+          value={password}
         />
-        {error && <p className="error">{error}</p>}
+        {error ? <p className="error">{error}</p> : null}
         <button type="submit">Login</button>
         <p className="auth-link">
-          Don't have an account? <Link to="/signup">Sign up</Link>
+          Don&apos;t have an account? <Link to="/signup">Sign up</Link>
         </p>
       </form>
     </main>

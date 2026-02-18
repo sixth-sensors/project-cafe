@@ -33,11 +33,11 @@ const Input = ({
     <input
       id={id}
       name={name}
+      onChange={onChange ? (e) => onChange(e.target.value) : undefined}
+      placeholder={placeholder}
+      required={required}
       type={inputType}
       value={value}
-      onChange={onChange ? (e) => onChange(e.target.value) : undefined}
-      required={required}
-      placeholder={placeholder}
     />
   )
 
