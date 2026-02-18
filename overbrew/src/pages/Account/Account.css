@@ -69,7 +69,7 @@
 }
 
 .account-error {
-  color: #cc0000;
+  color: var(--error);
   font-size: 0.875rem;
 }
 

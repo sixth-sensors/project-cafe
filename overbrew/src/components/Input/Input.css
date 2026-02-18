@@ -20,11 +20,11 @@
   }
 
   & input.input-error {
-    border-color: #cc0000;
+    border-color: var(--error);
   }
 
   & .input-error-msg {
-    color: #cc0000;
+    color: var(--error);
     font-size: 0.85rem;
   }
 }
