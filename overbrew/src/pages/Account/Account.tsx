@@ -15,7 +15,7 @@ const Account = () => {
   const [resetSent, setResetSent] = useState(false)
   const [resetError, setResetError] = useState<string | null>(null)
 
-  const handlePhotoSubmit = async (e: React.FormEvent) => {
+  const handlePhotoSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault()
     setPhotoError(null)
     setPhotoSuccess(false)
@@ -23,8 +23,10 @@ const Account = () => {
     try {
       await updateUserProfile(user, user.displayName ?? '', photoURL)
       setPhotoSuccess(true)
-    } catch (err) {
-      if (err instanceof Error) setPhotoError(err.message)
+    } catch (error) {
+      if (error instanceof Error) {
+        setPhotoError(error.message)
+      }
     }
   }
 
@@ -43,17 +45,16 @@ const Account = () => {
   return (
     <main className="account">
       <h1>Account</h1>
-
       <section className="account-section">
         <h2>Profile picture</h2>
         <div className="account-avatar-preview">
           <img
             alt={user?.displayName ?? 'Profile picture'}
             referrerPolicy="no-referrer"
-            src={photoURL || (user?.photoURL ?? avatarFallback)}
+            src={user?.photoURL ?? avatarFallback}
           />
         </div>
-        <form onSubmit={handlePhotoSubmit}>
+        <form className="account-form" onSubmit={handlePhotoSubmit}>
           <Input
             id="photo-url"
             label="Photo URL"
@@ -85,7 +86,7 @@ const Account = () => {
           A reset link will be sent to <strong>{user?.email}</strong>.
         </p>
         {resetError ? <p className="account-error">{resetError}</p> : null}
-        {resetSent ? (
+        {!resetSent ? (
           <p className="account-success">
             Password reset email sent - check your inbox.
           </p>

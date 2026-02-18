@@ -16,7 +16,7 @@
     font-size: 1rem;
     font-weight: 600;
     color: var(--dark-brown);
-    border-bottom: 1px solid var(--light-brown);
+    border-bottom: 1px solid var(--dark-brown);
     padding-bottom: 0.4rem;
   }
 
@@ -25,7 +25,7 @@
     color: var(--dark-brown);
   }
 
-  & form {
+  & .account-form {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
@@ -35,7 +35,7 @@
     padding: 0.75rem;
     background-color: var(--dark-orange);
     color: var(--cream);
-    font-size: 1rem;
+    font-size: 1.1rem;
     font-weight: bold;
     border: none;
     border-radius: 4px;
@@ -52,28 +52,26 @@
   & button:active {
     transform: scale(0.95);
   }
+
+  & .account-error {
+    color: var(--error);
+    font-size: 0.9rem;
+  }
+
+  & .account-success {
+    color: var(--success);
+    font-size: 0.9rem;
+  }
 }
 
-.account-avatar-preview {
-  & img {
-    width: 5rem;
-    height: 5rem;
-    border-radius: 50%;
-    border: 3px solid var(--light-brown);
-    object-fit: cover;
-  }
+.account-avatar-preview img {
+  width: 5rem;
+  width: 5rem;
+  border-radius: 50%;
+  border: 3px solid var(--dark-brown);
+  object-fit: cover;
 }
 
 .account-email {
   font-weight: 500;
-}
-
-.account-error {
-  color: var(--error) !important;
-  font-size: 0.875rem;
-}
-
-.account-success {
-  color: var(--success) !important;
-  font-size: 0.875rem;
 }
