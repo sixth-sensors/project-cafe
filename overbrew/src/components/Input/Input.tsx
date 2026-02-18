@@ -12,6 +12,7 @@ interface InputProps {
   required?: boolean
   placeholder?: string
   isPassword?: boolean
+  error?: string
 }
 
 const Input = ({
@@ -24,6 +25,7 @@ const Input = ({
   required = false,
   placeholder,
   isPassword = false,
+  error,
 }: InputProps) => {
   const [showPassword, setShowPassword] = useState(false)
 
@@ -31,6 +33,7 @@ const Input = ({
 
   const inputElement = (
     <input
+      className={error ? 'input-error' : undefined}
       id={id}
       name={name}
       onChange={onChange ? (e) => onChange(e.target.value) : undefined}
@@ -55,6 +58,7 @@ const Input = ({
             {showPassword ? <FaEyeSlash /> : <FaEye />}
           </button>
         </div>
+        {error ? <p className="input-error-msg">{error}</p> : null}
       </div>
     )
   }
@@ -63,6 +67,7 @@ const Input = ({
     <div className="text-input-group">
       <label htmlFor={id}>{label}</label>
       {inputElement}
+      {error ? <p className="input-error-msg">{error}</p> : null}
     </div>
   )
 }

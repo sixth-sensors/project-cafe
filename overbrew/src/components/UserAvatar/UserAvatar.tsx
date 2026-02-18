@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import type { User } from 'firebase/auth'
 import { logOut } from '../../firebase'
 import avatarFallback from '/avatar.png'
@@ -26,6 +27,9 @@ const UserAvatar = ({ user }: { user: User }) => {
       <nav className="avatar-dropdown" id="avatar-dropdown" popover="auto">
         <ul>
           <li className="avatar-dropdown-email">{user.email}</li>
+          <li>
+            <Link to="/account">Account</Link>
+          </li>
           <li>
             <a onClick={handleSignOut}>Sign Out</a>
           </li>

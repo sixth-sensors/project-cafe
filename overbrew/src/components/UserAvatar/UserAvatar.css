@@ -24,6 +24,7 @@
   top: calc(anchor(bottom) + 0.5rem);
   right: anchor(right);
   margin: 0;
+  padding: 0 0.5rem;
   overflow: visible;
   border-radius: 0.25rem;
   border: 1px solid var(--dark-brown);
@@ -47,6 +48,7 @@
     display: block;
     cursor: pointer;
     text-decoration: none;
+    padding: 0.2rem 0;
   }
 
   & a:hover {
