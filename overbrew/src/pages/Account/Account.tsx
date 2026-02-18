@@ -86,7 +86,7 @@ const Account = () => {
           A reset link will be sent to <strong>{user?.email}</strong>.
         </p>
         {resetError ? <p className="account-error">{resetError}</p> : null}
-        {!resetSent ? (
+        {resetSent ? (
           <p className="account-success">
             Password reset email sent - check your inbox.
           </p>
