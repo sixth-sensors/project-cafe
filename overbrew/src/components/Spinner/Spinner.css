@@ -1,8 +1,12 @@
 .spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
   width: 2rem;
   height: 2rem;
   margin: auto;
-  border: 3px solid var(--light-brown);
+  border: 5px solid transparent;
   border-top-color: var(--dark-orange);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
