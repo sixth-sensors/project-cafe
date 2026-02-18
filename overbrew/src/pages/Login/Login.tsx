@@ -80,6 +80,10 @@ const Login = () => {
         <p className="auth-link">
           Don&apos;t have an account? <Link to="/signup">Sign up</Link>
         </p>
+        <p className="auth-link">
+          Forgot your password?{' '}
+          <Link to="/password-reset">Reset your password.</Link>
+        </p>
       </form>
     </main>
   )

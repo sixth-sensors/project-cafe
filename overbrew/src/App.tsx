@@ -6,6 +6,7 @@ import Home from './pages/Home/Home'
 import Login from './pages/Login/Login'
 import Signup from './pages/Signup/Signup'
 import Account from './pages/Account/Account'
+import PasswordReset from './pages/PasswordReset/PasswordReset'
 
 const App = () => {
   return (
@@ -19,6 +20,7 @@ const App = () => {
         <Route element={<PublicOnlyRoute />}>
           <Route element={<Login />} path="/login" />
           <Route element={<Signup />} path="/signup" />
+          <Route element={<PasswordReset />} path="/password-reset" />
         </Route>
       </Routes>
     </BrowserRouter>
