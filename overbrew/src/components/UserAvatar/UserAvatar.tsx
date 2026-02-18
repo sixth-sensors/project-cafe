@@ -1,5 +1,6 @@
 import type { User } from 'firebase/auth'
 import { logOut } from '../../firebase'
+import avatarFallback from '/avatar.png'
 import './UserAvatar.css'
 
 const UserAvatar = ({ user }: { user: User }) => {
@@ -19,7 +20,7 @@ const UserAvatar = ({ user }: { user: User }) => {
           alt={user.displayName ?? 'Profile picture'}
           className="avatar"
           referrerPolicy="no-referrer"
-          src={user.photoURL ?? 'avatar.png'}
+          src={user.photoURL ?? avatarFallback}
         />
       </button>
       <nav className="avatar-dropdown" id="avatar-dropdown" popover="auto">
