@@ -82,7 +82,7 @@ const Login = () => {
         </p>
         <p className="auth-link">
           Forgot your password?{' '}
-          <Link to="/password-reset">Reset your password.</Link>
+          <Link to="/password-reset">Reset your password</Link>
         </p>
       </form>
     </main>
