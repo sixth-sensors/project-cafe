@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { Link } from 'react-router-dom'
 import type { User } from 'firebase/auth'
 import { logOut } from '../../firebase'
@@ -5,8 +6,14 @@ import avatarFallback from '/avatar.png'
 import './UserAvatar.css'
 
 const UserAvatar = ({ user }: { user: User }) => {
+  const popoverRef = useRef<HTMLElement>(null)
+
   const handleSignOut = async () => {
     await logOut()
+  }
+
+  const closePopover = () => {
+    popoverRef.current?.hidePopover()
   }
 
   return (
@@ -24,11 +31,18 @@ const UserAvatar = ({ user }: { user: User }) => {
           src={user.photoURL ?? avatarFallback}
         />
       </button>
-      <nav className="avatar-dropdown" id="avatar-dropdown" popover="auto">
+      <nav
+        className="avatar-dropdown"
+        id="avatar-dropdown"
+        popover="auto"
+        ref={popoverRef}
+      >
         <ul>
           <li className="avatar-dropdown-email">{user.email}</li>
           <li>
-            <Link to="/account">Account</Link>
+            <Link onClick={closePopover} to="/account">
+              Account
+            </Link>
           </li>
           <li>
             <a onClick={handleSignOut}>Sign Out</a>

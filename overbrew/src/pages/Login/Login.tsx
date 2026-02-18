@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import Input from '../../components/Input/Input'
 import { signInWithEmail } from '../../firebase'
-import { useAuth } from '../../hooks/useAuth'
 import './Login.css'
 
 interface FieldErrors {
@@ -15,8 +14,6 @@ const Login = () => {
   const [password, setPassword] = useState('')
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [error, setError] = useState<string | null>(null)
-
-  const { user } = useAuth()
 
   const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault()
@@ -46,12 +43,6 @@ const Login = () => {
     }
   }
 
-  useEffect(() => {
-    if (user) {
-      console.log('User logged in:', user)
-    }
-  }, [user])
-
   return (
     <main className="login">
       <h1>Login</h1>
@@ -79,6 +70,10 @@ const Login = () => {
         <button type="submit">Login</button>
         <p className="auth-link">
           Don&apos;t have an account? <Link to="/signup">Sign up</Link>
+        </p>
+        <p className="auth-link">
+          Forgot your password?{' '}
+          <Link to="/password-reset">Reset your password</Link>
         </p>
       </form>
     </main>
