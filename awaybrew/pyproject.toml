@@ -9,6 +9,8 @@ dependencies = [
     "msgpack>=1.1.2",
     "uvicorn[standard]>=0.40.0",
     "httpx >= 0.28.1",
+    "python-dotenv >= 1.2.1",
+    "firebase-admin >= 7.1.0",
     "project-cafe-utils",
 ]
 

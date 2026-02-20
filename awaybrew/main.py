@@ -1,9 +1,15 @@
 import asyncio
+import base64
 import copy
+import json
+import os
 import uuid
 
+import firebase_admin
 import httpx
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Response
+from firebase_admin import credentials
 from utils.packet import Packet
 from utils.sender import Sender
 
@@ -21,6 +27,19 @@ BREW_JOBS["dummy-job"] = {
 }
 
 app = FastAPI()
+
+# Initialize the Firebase app
+
+load_dotenv()
+firebase_admin_json = os.environ["FIREBASE_CREDENTIALS"]
+
+if not firebase_admin_json:
+    raise ValueError("Firebase credentials not set")  #
+firebase_admin_json = base64.b64decode(firebase_admin_json)
+service_account_info = json.loads(firebase_admin_json)
+cred = credentials.Certificate(service_account_info)
+firebase_admin.initialize_app(cred)
+print("Firebase Admin initialized successfully")
 
 
 @app.get("/")
