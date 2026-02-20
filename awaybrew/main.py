@@ -8,10 +8,15 @@ import uuid
 import firebase_admin
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Response
-from firebase_admin import credentials
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from firebase_admin import auth, credentials
 from utils.packet import Packet
 from utils.sender import Sender
+
+# Load environment variables
+load_dotenv()
 
 BREW_JOBS: dict[str, dict] = {}
 
@@ -28,23 +33,62 @@ BREW_JOBS["dummy-job"] = {
 
 app = FastAPI()
 
-# Initialize the Firebase app
+# Add CORS middleware to allow requests from the frontend dev server and production URL
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://cafe.miarolfe.com",
+        "http://localhost",
+        "http://localhost:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-load_dotenv()
+# Initialize the Firebase app
 firebase_admin_json = os.environ["FIREBASE_CREDENTIALS"]
 
 if not firebase_admin_json:
-    raise ValueError("Firebase credentials not set")  #
+    raise ValueError("Firebase credentials not set")
 firebase_admin_json = base64.b64decode(firebase_admin_json)
 service_account_info = json.loads(firebase_admin_json)
 cred = credentials.Certificate(service_account_info)
 firebase_admin.initialize_app(cred)
 print("Firebase Admin initialized successfully")
 
+# Set up the HTTPBearer scheme for token authentication
+bearer_scheme = HTTPBearer()
+
+# Verify the Firebase ID token from the Authorization header
+async def verify_token(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+) -> dict:        
+    print(credentials)
+    try:
+        decoded = auth.verify_id_token(credentials.credentials)
+    except auth.ExpiredIdTokenError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except auth.InvalidIdTokenError:
+        raise HTTPException(status_code=401, detail="Invalid ID token")
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Token verification failed: {e}")
+    return decoded
+
 
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
+
+
+#####################
+# TEST ENDPOINTS
+#####################
+
+
+@app.get("/test/protected")
+async def protected_test(token: dict = Depends(verify_token)):
+    return {"status": "authorized", "user": token}
 
 
 #####################
@@ -92,6 +136,7 @@ async def receive_telemetry(request: Request):
 # (These endpoints use JSON instead of msgpack,
 # as JSON is easier for React integration.)
 ##################################################
+
 
 
 @app.post("/brew")
