@@ -4,12 +4,13 @@ import copy
 import json
 import os
 import uuid
+from typing import Dict
 
 import firebase_admin
-import httpx
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from firebase_admin import auth, credentials
 from utils.packet import Packet
@@ -18,7 +19,10 @@ from utils.sender import Sender
 # Load environment variables
 load_dotenv()
 
+# TODO: STORE THESE IN DATABREW
 BREW_JOBS: dict[str, dict] = {}
+SUBSCRIBERS: set = set()  # Users subscribed to the service
+SSE_QUEUES: Dict[str, asyncio.Queue] = {}  # Mapping from a user to a queue of events.
 
 # TODO: DELETE HARDCODED DUMMY JOB
 BREW_JOBS["dummy-job"] = {
@@ -33,7 +37,6 @@ BREW_JOBS["dummy-job"] = {
 
 app = FastAPI()
 
-# Add CORS middleware to allow requests from the frontend dev server and production URL
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -51,29 +54,14 @@ firebase_admin_json = os.environ["FIREBASE_CREDENTIALS"]
 
 if not firebase_admin_json:
     raise ValueError("Firebase credentials not set")
+
 firebase_admin_json = base64.b64decode(firebase_admin_json)
 service_account_info = json.loads(firebase_admin_json)
 cred = credentials.Certificate(service_account_info)
 firebase_admin.initialize_app(cred)
 print("Firebase Admin initialized successfully")
 
-# Set up the HTTPBearer scheme for token authentication
 bearer_scheme = HTTPBearer()
-
-# Verify the Firebase ID token from the Authorization header
-async def verify_token(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-) -> dict:        
-    print(credentials)
-    try:
-        decoded = auth.verify_id_token(credentials.credentials)
-    except auth.ExpiredIdTokenError:
-        raise HTTPException(status_code=401, detail="Token has expired")
-    except auth.InvalidIdTokenError:
-        raise HTTPException(status_code=401, detail="Invalid ID token")
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Token verification failed: {e}")
-    return decoded
 
 
 @app.get("/")
@@ -86,9 +74,62 @@ def read_root():
 #####################
 
 
+async def verify_token(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+) -> dict:
+    print(credentials)
+    try:
+        decoded = auth.verify_id_token(credentials.credentials)
+    except auth.ExpiredIdTokenError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except auth.InvalidIdTokenError:
+        raise HTTPException(status_code=401, detail="Invalid ID token")
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Token verification failed: {e}")
+    return decoded
+
+
 @app.get("/test/protected")
 async def protected_test(token: dict = Depends(verify_token)):
     return {"status": "authorized", "user": token}
+
+
+#####################
+# SSE ENDPOINT
+#####################
+
+
+@app.get("/events/{user_id}")
+async def events(user_id: str, request: Request):
+    """
+    Server-Sent Events stream for a given user_id.
+    Client keeps this open to receive brew events in real time.
+    """
+    if user_id not in SUBSCRIBERS:
+        return Response(
+            content='{"type":"error","error":"not_subscribed"}',
+            media_type="application/json",
+            status_code=403,
+        )
+
+    q = get_queue(user_id)
+
+    async def sse_generator():
+        yield "data: connected\n\n"
+        while True:
+            if await request.is_disconnected():
+                break
+            try:
+                event = await asyncio.wait_for(q.get(), timeout=15)
+                yield f"data: {json.dumps(event)}\n\n"
+            except asyncio.TimeoutError:
+                yield "data: ping\n\n"
+
+    return StreamingResponse(
+        sse_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 #####################
@@ -138,7 +179,6 @@ async def receive_telemetry(request: Request):
 ##################################################
 
 
-
 @app.post("/brew")
 async def brew(request: Request):
     """
@@ -149,7 +189,11 @@ async def brew(request: Request):
     {
         "sender_id" : Sender.OVERBREW,
         "type" : "brew",
+        "user_id" : <ID OF THE USER LOGGED IN>
         "create_profile" : True | False,
+
+        "temperature" : <TARGET TEMPERATURE>
+
         "intent" : <Intent for the MCP server>
     }
     """
@@ -170,8 +214,18 @@ async def brew(request: Request):
 
     sender_id = msg.get("sender_id")
     msg_type = msg.get("type")
+    user_id = msg.get("user_id")
     create_profile = msg.get("create_profile")
     intent = msg.get("intent")
+
+    target_temperature = msg.get("temperature")
+
+    if user_id not in SUBSCRIBERS:
+        return Response(
+            content='{"type":"error","error":"User not a subscriber"}',
+            media_type="application/json",
+            status_code=403,
+        )
 
     if sender_id != Sender.OVERBREW or msg_type != "brew":
         return Response(
@@ -183,6 +237,10 @@ async def brew(request: Request):
     if (
         not isinstance(create_profile, bool)
         or not isinstance(intent, str)
+        or not isinstance(target_temperature, (float, int))
+        or not sender_id
+        or not msg_type
+        or not user_id
         or not intent
     ):
         return Response(
@@ -210,12 +268,33 @@ async def brew(request: Request):
     commands = []  # List of commands that will be taken by the brew.
     request_id = str(uuid.uuid4())
 
+    # SSE: let the user know the brew started immediately
+    await publish(
+        user_id,
+        {
+            "type": "brew_started",
+            "request_id": request_id,
+        },
+    )
+
     # TODO: enqueue into DB here
     if create_profile:
         pass
 
     # DUMMY CODE
-    await continually_send_brew_status()
+    await continually_send_brew_status(
+        user_id=user_id, request_id=request_id, target_temperature=target_temperature
+    )
+
+    # SSE: let the user know the brew finished
+    await publish(
+        user_id,
+        {
+            "type": "brew_finished",
+            "request_id": request_id,
+            "plan": commands,
+        },
+    )
 
     return {
         "sender_id": Sender.AWAYBREW,
@@ -223,6 +302,40 @@ async def brew(request: Request):
         "request_id": request_id,
         "plan": commands,
     }
+
+
+@app.post("/subscribe")
+async def subscribe(request: Request):
+    """
+    Subscribes a user to the brew service.
+
+    Expected packet format:
+    {
+        "sender_id" : Sender.OVERBREW,
+        "type" : "subscribe",
+        "user_id" : <USER ID>,
+        "enabled" : True | False
+    }
+    """
+
+    try:
+        msg = await request.json()
+    except Exception:
+        return {"error": "invalid_json"}
+
+    user_id = msg.get("user_id")
+    enabled = msg.get("enabled")
+
+    if not isinstance(user_id, str) or not isinstance(enabled, bool):
+        return {"error": "invalid_payload"}
+
+    if enabled:
+        SUBSCRIBERS.add(user_id)
+        get_queue(user_id)
+    else:
+        SUBSCRIBERS.discard(user_id)
+
+    return {"type": "subscription_updated", "user_id": user_id, "enabled": enabled}
 
 
 #####################
@@ -265,7 +378,9 @@ async def mcp_endpoint_stub(request: Request):
 ##########
 # HELPERS
 ##########
-async def continually_send_brew_status():
+async def continually_send_brew_status(
+    user_id: str, request_id: str, target_temperature: float
+):
     """
     Sends the brew status continually to Overbrew as the brew progresses.
 
@@ -275,36 +390,45 @@ async def continually_send_brew_status():
     the desired temperature is reached.
     """
 
-    OVERBREW_URL = "https://cafe.miarolfe.com/overbrew"
+    # OVERBREW_URL = "https://cafe.miarolfe.com/overbrew"
 
-    async with httpx.AsyncClient() as client:
-        temp = 10
-        backoff = 0.25
-        desired_temp = 90
-        while temp < desired_temp:
-            msg = {"sender_id": Sender.AWAYBREW, "type": "brew_progress", "temp": temp}
+    temp = 10
+    interval_s = 0.25
 
-            try:
-                r = await client.post(OVERBREW_URL, json=msg, timeout=10.0)
+    # Stream the current temperature to the frontend via Server-side events
+    while temp < target_temperature:
+        await publish(
+            user_id,
+            {
+                "type": "brew_progress",
+                "request_id": request_id,
+                "temp": temp,
+            },
+        )
 
-                if r.status_code >= 500:
-                    raise httpx.HTTPStatusError(
-                        "overbrew 5xx", request=r.request, response=r
-                    )
+        temp += 1
+        await asyncio.sleep(interval_s)
 
-                ctype = (r.headers.get("content-type") or "").lower()
-                if ctype.startswith("application/json"):
-                    ack = r.json()
-                else:
-                    ack = {"raw": r.text}
+    # Streaming the final temperature of the coffee to show that the job is done :D
+    await publish(
+        user_id,
+        {
+            "type": "brew_progress",
+            "request_id": request_id,
+            "temp": temp,
+        },
+    )
 
-                if isinstance(ack, dict) and ack.get("type") == "ack":
-                    temp += 1
-                    backoff = 0.25
-                    continue
 
-            except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError):
-                pass
+def get_queue(user_id: str):
+    q = SSE_QUEUES.get(user_id)
+    if q is None:
+        q = asyncio.Queue()
+        SSE_QUEUES[user_id] = q
+    return q
 
-            await asyncio.sleep(backoff)
-            backoff = min(backoff * 2, 5.0)
+
+async def publish(user_id: str, event: dict):
+    if user_id not in SUBSCRIBERS:
+        return
+    await get_queue(user_id).put(event)
