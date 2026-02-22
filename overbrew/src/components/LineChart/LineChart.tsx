@@ -54,7 +54,6 @@ const LineChart = ({ data, target }: { data: ChartData; target?: number }) => {
         tick={{ fontSize: 12 }}
         tickCount={6}
         tickFormatter={formatTemperature}
-        width="auto"
       />
       <Tooltip
         formatter={(value: number | undefined) =>

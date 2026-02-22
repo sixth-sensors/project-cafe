@@ -5,12 +5,17 @@
   height: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  min-height: 0;
+  min-width: 0;
 }
 
 .card {
   border-radius: 1rem;
   box-shadow: 4px 4px 4px rgba(0, 0, 0, 0.2);
   padding: 1rem 1.5rem;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .brew-content {

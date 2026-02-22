@@ -6,12 +6,14 @@ import {
   NUM_TEMPERATURE_POINTS,
 } from '../../../constants/temperature'
 import LineChart from '../../../components/LineChart/LineChart'
+import ProgressBar from '../../../components/ProgressBar/ProgressBar'
 import './Grids.css'
 
 const Info = () => {
   const [temperatureData, setTemperatureData] = useState<TemperatureReading[]>(
     []
   )
+  const [progress, setProgress] = useState(0.0)
 
   // TODO: Replace with actual backend service when available
   const mockServiceRef = useRef(new MockTemperatureService(TARGET_TEMPERATURE))
@@ -24,14 +26,19 @@ const Info = () => {
         const updated = [...prev, newReading]
         return updated.slice(-NUM_TEMPERATURE_POINTS)
       })
+      if (progress < 1.0) {
+        setProgress((prev) => Math.min(1, prev + 0.1))
+      }
     }, 2000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [progress])
 
   return (
     <div className="grid info-content">
-      <div className="card">Card 1</div>
+      <div className="card">
+        <ProgressBar progress={progress} />
+      </div>
       <div className="grid info-bottom">
         <div className="card">Card 2</div>
         <div className="card">Card 3</div>
