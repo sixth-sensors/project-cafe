@@ -1,5 +1,10 @@
 import { useRef, useEffect, useState, useMemo } from 'react'
 import './ProgressBar.css'
+import coffeeMachine from '/coffee_machine_with_jug.svg'
+import mugFilled from '/mug-filled.svg'
+import mugNearlyFilled from '/mug-nearly-filled.svg'
+import mugPartlyFilled from '/mug-partly-filled.svg'
+import mugEmpty from '/mug-empty.svg'
 import {
   FREQUENCY,
   AMPLITUDE,
@@ -76,10 +81,10 @@ const ProgressBar = ({ progress }: { progress: number }) => {
       <img
         alt="Coffee machine"
         className="progress-bar-machine"
-        src="coffee_machine_with_jug.svg"
+        src={coffeeMachine}
       />
       <div className="progress-bar-content" ref={containerRef}>
-        <span className="progress-bar-label">{displayPercent}%</span>
+        <span className="progress-bar-label">Brew: {displayPercent}%</span>
         <svg
           aria-valuemax={100}
           aria-valuemin={0}
@@ -132,12 +137,12 @@ const ProgressBar = ({ progress }: { progress: number }) => {
         className="progress-bar-mug-icon"
         src={
           displayPercent >= 100
-            ? 'mug-filled.svg'
+            ? mugFilled
             : displayPercent > 66
-              ? 'mug-nearly-filled.svg'
+              ? mugNearlyFilled
               : displayPercent > 33
-                ? 'mug-partly-filled.svg'
-                : 'mug-empty.svg'
+                ? mugPartlyFilled
+                : mugEmpty
         }
       />
     </div>
