@@ -38,7 +38,7 @@ const Info = () => {
     }, 2000)
 
     return () => clearInterval(interval)
-  }, [progress])
+  }, [progress, flowRate])
 
   return (
     <div className="grid info-content">

@@ -7,7 +7,7 @@ interface WaterLevelProps {
 
 const THRESHOLD = 25
 
-export default function WaterLevel({ percentage }: WaterLevelProps) {
+const WaterLevel = ({ percentage }: WaterLevelProps) => {
   const clamped = Math.max(0, Math.min(100, percentage))
   const isLow = clamped < THRESHOLD
 
@@ -30,9 +30,9 @@ export default function WaterLevel({ percentage }: WaterLevelProps) {
         <div className="wave-wrapper">
           <svg
             className="wave"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 400 30"
             preserveAspectRatio="none"
+            viewBox="0 0 400 30"
+            xmlns="http://www.w3.org/2000/svg"
           >
             <path
               d="M0,15 Q25,0 50,15 Q75,30 100,15 Q125,0 150,15 Q175,30 200,15
@@ -49,3 +49,5 @@ export default function WaterLevel({ percentage }: WaterLevelProps) {
     </div>
   )
 }
+
+export default WaterLevel

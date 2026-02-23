@@ -33,9 +33,12 @@ const FlowRateDropper = ({ flowRate }: FlowRateDropperProps) => {
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const styleRef = useRef<HTMLStyleElement | null>(null)
+  const animRef = useRef<Animation | null>(null)
   const pendingRef = useRef({ totalDuration, growDuration })
 
-  pendingRef.current = { totalDuration, growDuration }
+  useEffect(() => {
+    pendingRef.current = { totalDuration, growDuration }
+  })
 
   useEffect(() => {
     if (!styleRef.current) {
@@ -43,11 +46,14 @@ const FlowRateDropper = ({ flowRate }: FlowRateDropperProps) => {
       document.head.appendChild(styleRef.current)
     }
     styleRef.current.textContent = buildKeyframes(totalDuration, growDuration)
+    if (animRef.current) {
+      animRef.current.updatePlaybackRate(BASE_DURATION / totalDuration)
+    }
     return () => {
       styleRef.current?.remove()
       styleRef.current = null
     }
-  }, [])
+  }, [growDuration, totalDuration])
 
   useEffect(() => {
     const icon =
@@ -57,6 +63,7 @@ const FlowRateDropper = ({ flowRate }: FlowRateDropperProps) => {
     const anim = icon.getAnimations()[0]
     if (!anim) return
 
+    animRef.current = anim
     anim.updatePlaybackRate(BASE_DURATION / pendingRef.current.totalDuration)
 
     const handleIteration = () => {
@@ -68,7 +75,10 @@ const FlowRateDropper = ({ flowRate }: FlowRateDropperProps) => {
     }
 
     icon.addEventListener('animationiteration', handleIteration)
-    return () => icon.removeEventListener('animationiteration', handleIteration)
+    return () => {
+      icon.removeEventListener('animationiteration', handleIteration)
+      animRef.current = null
+    }
   }, [])
 
   return (
@@ -77,7 +87,7 @@ const FlowRateDropper = ({ flowRate }: FlowRateDropperProps) => {
       <div className="dropper-top">Flow Rate</div>
       <div className="dropper-nozzle" />
       <div className="pot-container">
-        <img src={pot} className="pot" />
+        <img className="pot" src={pot} />
         <div className="pot-flow-rate">
           {`${flowRate.toFixed(1)} `}
           <span className="pot-flow-rate-unit">g/s</span>
