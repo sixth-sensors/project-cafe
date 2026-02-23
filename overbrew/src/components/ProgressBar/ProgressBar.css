@@ -35,6 +35,7 @@
   font-weight: 600;
   text-align: center;
   letter-spacing: 0.05em;
+  margin-top: 0.5rem;
   color: var(--light-brown);
 }
 

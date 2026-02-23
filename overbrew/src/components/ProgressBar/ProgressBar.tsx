@@ -28,7 +28,6 @@ const ProgressBar = ({ progress }: { progress: number }) => {
   const frameRef = useRef<number | null>(null)
   const percent = Math.max(0, Math.min(100, progress * 100))
 
-  // Update width on resize
   useEffect(() => {
     const el = containerRef.current!
     const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width))
@@ -37,7 +36,6 @@ const ProgressBar = ({ progress }: { progress: number }) => {
     return () => ro.disconnect()
   }, [])
 
-  // Animate updates to progress
   useEffect(() => {
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current)
 
@@ -57,7 +55,6 @@ const ProgressBar = ({ progress }: { progress: number }) => {
     }
   }, [percent])
 
-  // Wave runs from PAD to width-PAD so round caps stay within SVG bounds
   const trackWidth = width - 2 * PAD
   const wavePath = useMemo(() => {
     const steps = Math.max(200, Math.round(trackWidth * 1.5))
@@ -68,12 +65,10 @@ const ProgressBar = ({ progress }: { progress: number }) => {
     }).join(' ')
   }, [trackWidth])
 
-  // Calculate tip position
   const tipX = PAD + (animatedPercent / 100) * trackWidth
   const tipY =
     CY - AMPLITUDE * Math.sin((animatedPercent / 100) * FREQUENCY * 2 * Math.PI)
 
-  // Round displayed percent for label
   const displayPercent = Math.round(animatedPercent)
 
   return (
@@ -84,7 +79,7 @@ const ProgressBar = ({ progress }: { progress: number }) => {
         src={coffeeMachine}
       />
       <div className="progress-bar-content" ref={containerRef}>
-        <span className="progress-bar-label">Brew: {displayPercent}%</span>
+        <span className="progress-bar-label">Progress: {displayPercent}%</span>
         <svg
           aria-valuemax={100}
           aria-valuemin={0}
