@@ -8,6 +8,7 @@ import {
 import LineChart from '../../../components/LineChart/LineChart'
 import ProgressBar from '../../../components/ProgressBar/ProgressBar'
 import FlowRateDropper from '../../../components/FlowRateDropper/FlowRateDropper'
+import WaterLevel from '../../../components/WaterLevel/WaterLevel'
 import './Grids.css'
 
 const Info = () => {
@@ -45,7 +46,9 @@ const Info = () => {
         <ProgressBar progress={progress} />
       </div>
       <div className="grid info-bottom">
-        <div className="card">Card 2</div>
+        <div className="card water-level">
+          <WaterLevel percentage={progress * 100} />
+        </div>
         <div className="card dropper">
           <FlowRateDropper flowRate={flowRate} />
         </div>

@@ -54,3 +54,7 @@
   align-items: stretch;
   background-color: var(--dark-grey);
 }
+
+.info-content .water-level {
+  padding: 0;
+}
