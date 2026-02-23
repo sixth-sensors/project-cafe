@@ -46,3 +46,11 @@
       6fr
     );
 }
+
+.info-content .dropper {
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  background-color: var(--dark-grey);
+}

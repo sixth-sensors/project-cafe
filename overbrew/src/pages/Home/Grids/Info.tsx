@@ -7,6 +7,7 @@ import {
 } from '../../../constants/temperature'
 import LineChart from '../../../components/LineChart/LineChart'
 import ProgressBar from '../../../components/ProgressBar/ProgressBar'
+import FlowRateDropper from '../../../components/FlowRateDropper/FlowRateDropper'
 import './Grids.css'
 
 const Info = () => {
@@ -14,6 +15,7 @@ const Info = () => {
     []
   )
   const [progress, setProgress] = useState(0.0)
+  const [flowRate, setFlowRate] = useState(0.1)
 
   // TODO: Replace with actual backend service when available
   const mockServiceRef = useRef(new MockTemperatureService(TARGET_TEMPERATURE))
@@ -27,7 +29,10 @@ const Info = () => {
         return updated.slice(-NUM_TEMPERATURE_POINTS)
       })
       if (progress < 1.0) {
-        setProgress((prev) => Math.min(1, prev + 0.1))
+        setProgress((prev) => Math.min(1, prev + 0.02))
+      }
+      if (flowRate < 4.0) {
+        setFlowRate((prev) => Math.min(4, prev + 0.1))
       }
     }, 2000)
 
@@ -41,7 +46,9 @@ const Info = () => {
       </div>
       <div className="grid info-bottom">
         <div className="card">Card 2</div>
-        <div className="card">Card 3</div>
+        <div className="card dropper">
+          <FlowRateDropper flowRate={flowRate} />
+        </div>
         <div className="card">
           <LineChart data={temperatureData} target={TARGET_TEMPERATURE} />
         </div>

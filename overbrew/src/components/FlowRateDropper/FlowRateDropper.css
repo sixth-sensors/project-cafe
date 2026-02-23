@@ -1,0 +1,74 @@
+.flow-rate-dropper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.dropper-icon {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--light-brown);
+  animation: dropper-fall 2s linear infinite;
+  font-size: 0rem;
+}
+
+.dropper-top {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  height: 20%;
+  background-color: var(--grey);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--cream);
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.dropper-nozzle {
+  position: absolute;
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10%;
+  height: 5%;
+  background-color: var(--silver);
+  border-radius: 0 0 45% 45%;
+}
+
+.pot-container {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 75%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  container-type: inline-size;
+}
+
+.pot {
+  width: 100%;
+  height: auto;
+}
+
+.pot-flow-rate {
+  position: absolute;
+  top: 35%;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--cream);
+  font-size: 20cqw;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.pot-flow-rate-unit {
+  font-size: 10cqw;
+}
