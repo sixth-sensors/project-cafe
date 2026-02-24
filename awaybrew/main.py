@@ -4,16 +4,26 @@ import copy
 import json
 import os
 import uuid
+from datetime import datetime
 
 import firebase_admin
-import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Response
-from firebase_admin import credentials
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from firebase_admin import auth, credentials
 from utils.packet import Packet
 from utils.sender import Sender
 
+# Load environment variables
+load_dotenv()
+
+# TODO: STORE THESE IN DATABREW
 BREW_JOBS: dict[str, dict] = {}
+SSE_QUEUES: set[asyncio.Queue] = (
+    set()
+)  # List of queues for all connected SSE clients. Each client has its own queue.
 
 # TODO: DELETE HARDCODED DUMMY JOB
 BREW_JOBS["dummy-job"] = {
@@ -28,23 +38,150 @@ BREW_JOBS["dummy-job"] = {
 
 app = FastAPI()
 
-# Initialize the Firebase app
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://cafe.miarolfe.com",
+        "http://localhost",
+        "http://localhost:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-load_dotenv()
+# Initialize the Firebase app
 firebase_admin_json = os.environ["FIREBASE_CREDENTIALS"]
 
 if not firebase_admin_json:
-    raise ValueError("Firebase credentials not set")  #
+    raise ValueError("Firebase credentials not set")
+
 firebase_admin_json = base64.b64decode(firebase_admin_json)
 service_account_info = json.loads(firebase_admin_json)
 cred = credentials.Certificate(service_account_info)
 firebase_admin.initialize_app(cred)
 print("Firebase Admin initialized successfully")
 
+bearer_scheme = HTTPBearer()
+
 
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
+
+
+#####################
+# TEST ENDPOINTS
+#####################
+
+
+async def verify_token(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+) -> dict:
+    try:
+        decoded = auth.verify_id_token(credentials.credentials)
+    except auth.ExpiredIdTokenError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except auth.InvalidIdTokenError:
+        raise HTTPException(status_code=401, detail="Invalid ID token")
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Token verification failed: {e}")
+    return decoded
+
+
+@app.get("/test/protected")
+async def protected_test(token: dict = Depends(verify_token)):
+    return {"status": "authorized", "user": token}
+
+
+@app.post("/mock-brew")
+async def mock_brew(token: dict = Depends(verify_token)):
+    async def run():
+        async def mock_telemetry_data(
+            target_temp: float = 95.0, interval_s: float = 2.0
+        ):
+            import random
+
+            ROOM_TEMPERATURE = 21.0
+            TARGET_THRESHOLD = 3.0
+            HEATING_RATE_BASE = 4.0
+            HEATING_RATE_VARIANCE = 3.0
+            FLUCTUATION_RANGE = 1.5
+
+            current_temp = ROOM_TEMPERATURE + (random.random() - 0.5) * 2
+            while True:
+                distance = target_temp - current_temp
+                if abs(distance) > TARGET_THRESHOLD:
+                    heating_rate = (
+                        HEATING_RATE_BASE
+                        + (random.random() - 0.5) * HEATING_RATE_VARIANCE
+                    )
+                    current_temp += heating_rate
+                    if current_temp > target_temp:
+                        current_temp = (
+                            target_temp + (random.random() - 0.5) * FLUCTUATION_RANGE
+                        )
+                else:
+                    current_temp = (
+                        target_temp + (random.random() - 0.5) * FLUCTUATION_RANGE * 2
+                    )
+
+                now = datetime.now()
+                yield {
+                    "temp": round(current_temp, 1),
+                    "target_temp": target_temp,
+                    "time": now.strftime("%H:%M:%S"),
+                    "timestamp": int(now.timestamp() * 1000),
+                }
+                await asyncio.sleep(interval_s)
+
+        request_id = str(uuid.uuid4())
+
+        count = 0
+        async for reading in mock_telemetry_data():
+            await broadcast({"type": "telemetry", "request_id": request_id, **reading})
+            count += 1
+            if count >= 100:
+                break
+
+    asyncio.create_task(run())
+    return {"status": "started"}
+
+
+#####################
+# SSE ENDPOINT
+#####################
+
+
+@app.get("/telemetry/stream")
+async def get_telemetry_data(request: Request, token: str = Query(...)):
+    try:
+        auth.verify_id_token(token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    queue = asyncio.Queue()
+    SSE_QUEUES.add(queue)
+
+    async def sse_generator():
+        yield f"data: {json.dumps({'type': 'connected'})}\n\n"
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=15)
+                    yield f"data: {json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"  # keepalive comment
+        finally:
+            SSE_QUEUES.discard(queue)
+
+    return StreamingResponse(
+        sse_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 #####################
@@ -104,7 +241,11 @@ async def brew(request: Request):
     {
         "sender_id" : Sender.OVERBREW,
         "type" : "brew",
+        "user_id" : <ID OF THE USER LOGGED IN>
         "create_profile" : True | False,
+
+        "temperature" : <TARGET TEMPERATURE>
+
         "intent" : <Intent for the MCP server>
     }
     """
@@ -125,8 +266,11 @@ async def brew(request: Request):
 
     sender_id = msg.get("sender_id")
     msg_type = msg.get("type")
+    user_id = msg.get("user_id")
     create_profile = msg.get("create_profile")
     intent = msg.get("intent")
+
+    target_temperature = msg.get("temperature")
 
     if sender_id != Sender.OVERBREW or msg_type != "brew":
         return Response(
@@ -138,6 +282,10 @@ async def brew(request: Request):
     if (
         not isinstance(create_profile, bool)
         or not isinstance(intent, str)
+        or not isinstance(target_temperature, (float, int))
+        or not sender_id
+        or not msg_type
+        or not user_id
         or not intent
     ):
         return Response(
@@ -165,12 +313,31 @@ async def brew(request: Request):
     commands = []  # List of commands that will be taken by the brew.
     request_id = str(uuid.uuid4())
 
+    # SSE: let the user know the brew started immediately
+    await broadcast(
+        {
+            "type": "brew_started",
+            "request_id": request_id,
+        },
+    )
+
     # TODO: enqueue into DB here
     if create_profile:
         pass
 
     # DUMMY CODE
-    await continually_send_brew_status()
+    await continually_send_brew_status(
+        user_id=user_id, request_id=request_id, target_temperature=target_temperature
+    )
+
+    # SSE: let the user know the brew finished
+    await broadcast(
+        {
+            "type": "brew_finished",
+            "request_id": request_id,
+            "plan": commands,
+        },
+    )
 
     return {
         "sender_id": Sender.AWAYBREW,
@@ -220,7 +387,9 @@ async def mcp_endpoint_stub(request: Request):
 ##########
 # HELPERS
 ##########
-async def continually_send_brew_status():
+async def continually_send_brew_status(
+    user_id: str, request_id: str, target_temperature: float
+):
     """
     Sends the brew status continually to Overbrew as the brew progresses.
 
@@ -230,36 +399,39 @@ async def continually_send_brew_status():
     the desired temperature is reached.
     """
 
-    OVERBREW_URL = "https://cafe.miarolfe.com/overbrew"
+    # OVERBREW_URL = "https://cafe.miarolfe.com/overbrew"
 
-    async with httpx.AsyncClient() as client:
-        temp = 10
-        backoff = 0.25
-        desired_temp = 90
-        while temp < desired_temp:
-            msg = {"sender_id": Sender.AWAYBREW, "type": "brew_progress", "temp": temp}
+    temp = 10
+    interval_s = 2
 
-            try:
-                r = await client.post(OVERBREW_URL, json=msg, timeout=10.0)
+    # Stream the current temperature to the frontend via Server-side events
+    while temp < target_temperature:
+        await broadcast(
+            {
+                "type": "brew_progress",
+                "request_id": request_id,
+                "temp": temp,
+            },
+        )
 
-                if r.status_code >= 500:
-                    raise httpx.HTTPStatusError(
-                        "overbrew 5xx", request=r.request, response=r
-                    )
+        temp += 1
+        await asyncio.sleep(interval_s)
 
-                ctype = (r.headers.get("content-type") or "").lower()
-                if ctype.startswith("application/json"):
-                    ack = r.json()
-                else:
-                    ack = {"raw": r.text}
+    # Streaming the final temperature of the coffee to show that the job is done :D
+    await broadcast(
+        {
+            "type": "brew_progress",
+            "request_id": request_id,
+            "temp": temp,
+        },
+    )
 
-                if isinstance(ack, dict) and ack.get("type") == "ack":
-                    temp += 1
-                    backoff = 0.25
-                    continue
 
-            except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError):
-                pass
-
-            await asyncio.sleep(backoff)
-            backoff = min(backoff * 2, 5.0)
+async def broadcast(event: dict):
+    """
+    Broadcasts an event to all subscribed users. Events added
+    to the user's queue will be picked up by the SSE endpoint
+    and sent to the frontend.
+    """
+    for queue in list(SSE_QUEUES):
+        await queue.put(event)

@@ -1,34 +1,39 @@
-import { useEffect, useRef, useState } from 'react'
-import type { TemperatureReading } from './Info.types'
-import { MockTemperatureService } from '../../../components/LineChart/mockTemperatureService'
-import {
-  TARGET_TEMPERATURE,
-  NUM_TEMPERATURE_POINTS,
-} from '../../../constants/temperature'
+import { useEffect, useState } from 'react'
+import { TARGET_TEMPERATURE } from '../../../constants/temperature'
 import LineChart from '../../../components/LineChart/LineChart'
 import ProgressBar from '../../../components/ProgressBar/ProgressBar'
 import FlowRateDropper from '../../../components/FlowRateDropper/FlowRateDropper'
 import WaterLevel from '../../../components/WaterLevel/WaterLevel'
 import './Grids.css'
+import { useTelemetryStream } from '../../../hooks/useTelemetryStream'
+
+interface TemperatureData {
+  time: string
+  temperature: number
+  timestamp: number
+  target_temp?: number
+}
 
 const Info = () => {
-  const [temperatureData, setTemperatureData] = useState<TemperatureReading[]>(
-    []
-  )
+  const { latest } = useTelemetryStream()
+  const [temperatureData, setTemperatureData] = useState<TemperatureData[]>([])
   const [progress, setProgress] = useState(0.0)
   const [flowRate, setFlowRate] = useState(0.1)
 
-  // TODO: Replace with actual backend service when available
-  const mockServiceRef = useRef(new MockTemperatureService(TARGET_TEMPERATURE))
-
   useEffect(() => {
+    if (!latest || latest.type !== 'telemetry') return
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTemperatureData((prev) => [
+      ...prev,
+      {
+        time: latest.time,
+        temperature: latest.temp,
+        timestamp: latest.timestamp,
+      },
+    ])
+
     const interval = setInterval(() => {
-      // TODO: Replace with actual backend endpoint when available
-      const newReading = mockServiceRef.current.getNextReading()
-      setTemperatureData((prev) => {
-        const updated = [...prev, newReading]
-        return updated.slice(-NUM_TEMPERATURE_POINTS)
-      })
       if (progress < 1.0) {
         setProgress((prev) => Math.min(1, prev + 0.02))
       }
@@ -38,7 +43,7 @@ const Info = () => {
     }, 2000)
 
     return () => clearInterval(interval)
-  }, [progress, flowRate])
+  }, [latest, progress, flowRate])
 
   return (
     <div className="grid info-content">
@@ -53,7 +58,10 @@ const Info = () => {
           <FlowRateDropper flowRate={flowRate} />
         </div>
         <div className="card">
-          <LineChart data={temperatureData} target={TARGET_TEMPERATURE} />
+          <LineChart
+            data={temperatureData}
+            target={temperatureData[0]?.target_temp ?? TARGET_TEMPERATURE}
+          />
         </div>
       </div>
     </div>
