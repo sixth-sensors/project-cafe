@@ -32,18 +32,16 @@ const Info = () => {
         timestamp: latest.timestamp,
       },
     ])
+  }, [latest])
 
+  useEffect(() => {
     const interval = setInterval(() => {
-      if (progress < 1.0) {
-        setProgress((prev) => Math.min(1, prev + 0.02))
-      }
-      if (flowRate < 4.0) {
-        setFlowRate((prev) => Math.min(4, prev + 0.1))
-      }
+      setProgress((prev) => (prev < 1.0 ? Math.min(1, prev + 0.02) : prev))
+      setFlowRate((prev) => (prev < 4.0 ? Math.min(4, prev + 0.1) : prev))
     }, 2000)
 
     return () => clearInterval(interval)
-  }, [latest, progress, flowRate])
+  }, [])
 
   return (
     <div className="grid info-content">
