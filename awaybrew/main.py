@@ -21,7 +21,9 @@ load_dotenv()
 
 # TODO: STORE THESE IN DATABREW
 BREW_JOBS: dict[str, dict] = {}
-SSE_QUEUES: set[asyncio.Queue] = set() # List of queues for all connected SSE clients. Each client has its own queue.
+SSE_QUEUES: set[asyncio.Queue] = (
+    set()
+)  # List of queues for all connected SSE clients. Each client has its own queue.
 
 # TODO: DELETE HARDCODED DUMMY JOB
 BREW_JOBS["dummy-job"] = {
@@ -91,11 +93,15 @@ async def verify_token(
 async def protected_test(token: dict = Depends(verify_token)):
     return {"status": "authorized", "user": token}
 
+
 @app.post("/mock-brew")
 async def mock_brew(token: dict = Depends(verify_token)):
     async def run():
-        async def mock_telemetry_data(target_temp: float = 95.0, interval_s: float = 2.0):
+        async def mock_telemetry_data(
+            target_temp: float = 95.0, interval_s: float = 2.0
+        ):
             import random
+
             ROOM_TEMPERATURE = 21.0
             TARGET_THRESHOLD = 3.0
             HEATING_RATE_BASE = 4.0
@@ -106,12 +112,19 @@ async def mock_brew(token: dict = Depends(verify_token)):
             while True:
                 distance = target_temp - current_temp
                 if abs(distance) > TARGET_THRESHOLD:
-                    heating_rate = HEATING_RATE_BASE + (random.random() - 0.5) * HEATING_RATE_VARIANCE
+                    heating_rate = (
+                        HEATING_RATE_BASE
+                        + (random.random() - 0.5) * HEATING_RATE_VARIANCE
+                    )
                     current_temp += heating_rate
                     if current_temp > target_temp:
-                        current_temp = target_temp + (random.random() - 0.5) * FLUCTUATION_RANGE
+                        current_temp = (
+                            target_temp + (random.random() - 0.5) * FLUCTUATION_RANGE
+                        )
                 else:
-                    current_temp = target_temp + (random.random() - 0.5) * FLUCTUATION_RANGE * 2
+                    current_temp = (
+                        target_temp + (random.random() - 0.5) * FLUCTUATION_RANGE * 2
+                    )
 
                 now = datetime.now()
                 yield {
@@ -134,6 +147,7 @@ async def mock_brew(token: dict = Depends(verify_token)):
     asyncio.create_task(run())
     return {"status": "started"}
 
+
 #####################
 # SSE ENDPOINT
 #####################
@@ -150,7 +164,7 @@ async def get_telemetry_data(request: Request, token: str = Query(...)):
     SSE_QUEUES.add(queue)
 
     async def sse_generator():
-        yield f"data: {json.dumps({'type':'connected'})}\n\n"
+        yield f"data: {json.dumps({'type': 'connected'})}\n\n"
         try:
             while True:
                 if await request.is_disconnected():
@@ -159,7 +173,7 @@ async def get_telemetry_data(request: Request, token: str = Query(...)):
                     event = await asyncio.wait_for(queue.get(), timeout=15)
                     yield f"data: {json.dumps(event)}\n\n"
                 except asyncio.TimeoutError:
-                    yield ": ping\n\n"   # keepalive comment
+                    yield ": ping\n\n"  # keepalive comment
         finally:
             SSE_QUEUES.discard(queue)
 
@@ -332,6 +346,7 @@ async def brew(request: Request):
         "plan": commands,
     }
 
+
 #####################
 # AUTOBREW ENDPOINTS
 #####################
@@ -411,10 +426,11 @@ async def continually_send_brew_status(
         },
     )
 
+
 async def broadcast(event: dict):
     """
-    Broadcasts an event to all subscribed users. Events added 
-    to the user's queue will be picked up by the SSE endpoint 
+    Broadcasts an event to all subscribed users. Events added
+    to the user's queue will be picked up by the SSE endpoint
     and sent to the frontend.
     """
     for queue in list(SSE_QUEUES):
