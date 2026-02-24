@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { TARGET_TEMPERATURE } from '../../../constants/temperature'
 import LineChart from '../../../components/LineChart/LineChart'
+import ProgressBar from '../../../components/ProgressBar/ProgressBar'
+import FlowRateDropper from '../../../components/FlowRateDropper/FlowRateDropper'
+import WaterLevel from '../../../components/WaterLevel/WaterLevel'
 import './Grids.css'
 import { useTelemetryStream } from '../../../hooks/useTelemetryStream'
 
@@ -14,6 +17,8 @@ interface TemperatureData {
 const Info = () => {
   const { latest } = useTelemetryStream()
   const [temperatureData, setTemperatureData] = useState<TemperatureData[]>([])
+  const [progress, setProgress] = useState(0.0)
+  const [flowRate, setFlowRate] = useState(0.1)
 
   useEffect(() => {
     if (!latest || latest.type !== 'telemetry') return
@@ -27,14 +32,31 @@ const Info = () => {
         timestamp: latest.timestamp,
       },
     ])
-  }, [latest])
+
+    const interval = setInterval(() => {
+      if (progress < 1.0) {
+        setProgress((prev) => Math.min(1, prev + 0.02))
+      }
+      if (flowRate < 4.0) {
+        setFlowRate((prev) => Math.min(4, prev + 0.1))
+      }
+    }, 2000)
+
+    return () => clearInterval(interval)
+  }, [latest, progress, flowRate])
 
   return (
     <div className="grid info-content">
-      <div className="card">Card 1</div>
+      <div className="card">
+        <ProgressBar progress={progress} />
+      </div>
       <div className="grid info-bottom">
-        <div className="card">Card 2</div>
-        <div className="card">Card 3</div>
+        <div className="card water-level">
+          <WaterLevel percentage={progress * 100} />
+        </div>
+        <div className="card dropper">
+          <FlowRateDropper flowRate={flowRate} />
+        </div>
         <div className="card">
           <LineChart
             data={temperatureData}

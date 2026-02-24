@@ -67,7 +67,7 @@ const Home = () => {
           className="page-slide"
           style={{
             transform:
-              activePage === Page.Brew ? 'translateX(0)' : 'translateX(-100%)',
+              activePage === Page.Brew ? 'translateX(0)' : 'translateX(-150%)',
           }}
         >
           <Brew />
@@ -76,7 +76,7 @@ const Home = () => {
           className="page-slide"
           style={{
             transform:
-              activePage === Page.Info ? 'translateX(0)' : 'translateX(100%)',
+              activePage === Page.Info ? 'translateX(0)' : 'translateX(150%)',
           }}
         >
           <Info />

@@ -17,10 +17,10 @@ const LineChart = ({ data, target }: { data: ChartData; target?: number }) => {
     <LineChartRe
       data={data}
       margin={{
-        top: 20,
+        top: 10,
         right: 0,
         left: 5,
-        bottom: 5,
+        bottom: -20,
       }}
       responsive
       style={{
@@ -30,6 +30,15 @@ const LineChart = ({ data, target }: { data: ChartData; target?: number }) => {
         maxHeight: '70vh',
       }}
     >
+      <Legend
+        verticalAlign="top"
+        wrapperStyle={{
+          fontSize: '1.5rem',
+          fontWeight: '600',
+          fontFamily: 'Roboto, sans-serif',
+          paddingBottom: '1rem',
+        }}
+      />
       <CartesianGrid opacity={0.5} stroke="#cccccc" strokeDasharray="3 3" />
       <XAxis
         angle={-45}
@@ -54,7 +63,6 @@ const LineChart = ({ data, target }: { data: ChartData; target?: number }) => {
         tick={{ fontSize: 12 }}
         tickCount={6}
         tickFormatter={formatTemperature}
-        width="auto"
       />
       <Tooltip
         formatter={(value: number | undefined) =>
@@ -63,7 +71,6 @@ const LineChart = ({ data, target }: { data: ChartData; target?: number }) => {
             : ['N/A', 'Temperature']
         }
       />
-      <Legend />
       {target !== undefined ? (
         <ReferenceLine
           label={{

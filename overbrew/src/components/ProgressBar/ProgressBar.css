@@ -1,0 +1,58 @@
+/* ProgressBar.css */
+
+.progress-bar-root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.progress-bar-machine {
+  height: auto;
+  width: 60px;
+  flex-shrink: 0;
+  margin: 0 5px;
+}
+
+.progress-bar-mug-icon {
+  height: auto;
+  width: 70px;
+  flex-shrink: 0;
+}
+
+.progress-bar-content {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.progress-bar-label {
+  font-size: 1.5rem;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 0.05em;
+  margin-top: 0.5rem;
+  color: var(--light-brown);
+}
+
+.progress-bar-svg {
+  display: block;
+  overflow: visible;
+}
+
+.progress-bar-track {
+  stroke: var(--lighter-brown);
+  stroke-opacity: 0.3;
+}
+
+.progress-bar-fill {
+  stroke: var(--light-brown);
+}
+
+.progress-bar-tip {
+  fill: var(--light-brown);
+}
