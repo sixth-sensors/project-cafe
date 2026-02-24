@@ -5,8 +5,6 @@ import type { NavLink } from '../../components/Navbar/Navbar.types'
 import Brew from './Grids/Brew'
 import Info from './Grids/Info'
 import './Home.css'
-import { apiFetch } from '../../lib/api'
-import { useAuth } from '../../hooks/useAuth'
 
 const getPageFromHash = (): Page => {
   const hash = window.location.hash.slice(1)
@@ -24,23 +22,6 @@ const Home = () => {
     window.addEventListener('hashchange', handleHashChange)
     return () => window.removeEventListener('hashchange', handleHashChange)
   }, [])
-
-  const { user } = useAuth()
-
-  useEffect(() => {
-    if (!user) return
-
-    const testApi = async () => {
-      try {
-        const response = await apiFetch('/test/protected')
-        console.log('API response:', response)
-      } catch (error) {
-        console.error('API error:', error)
-      }
-    }
-
-    testApi()
-  }, [user])
 
   const links: NavLink[] = [
     {

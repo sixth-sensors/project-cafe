@@ -4,11 +4,11 @@ import copy
 import json
 import os
 import uuid
-from typing import Dict
+from datetime import datetime
 
 import firebase_admin
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -21,8 +21,7 @@ load_dotenv()
 
 # TODO: STORE THESE IN DATABREW
 BREW_JOBS: dict[str, dict] = {}
-SUBSCRIBERS: set = set()  # Users subscribed to the service
-SSE_QUEUES: Dict[str, asyncio.Queue] = {}  # Mapping from a user to a queue of events.
+SSE_QUEUES: set[asyncio.Queue] = set() # List of queues for all connected SSE clients. Each client has its own queue.
 
 # TODO: DELETE HARDCODED DUMMY JOB
 BREW_JOBS["dummy-job"] = {
@@ -77,7 +76,6 @@ def read_root():
 async def verify_token(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> dict:
-    print(credentials)
     try:
         decoded = auth.verify_id_token(credentials.credentials)
     except auth.ExpiredIdTokenError:
@@ -93,37 +91,77 @@ async def verify_token(
 async def protected_test(token: dict = Depends(verify_token)):
     return {"status": "authorized", "user": token}
 
+@app.post("/mock-brew")
+async def mock_brew(token: dict = Depends(verify_token)):
+    async def run():
+        async def mock_telemetry_data(target_temp: float = 95.0, interval_s: float = 2.0):
+            import random
+            ROOM_TEMPERATURE = 21.0
+            TARGET_THRESHOLD = 3.0
+            HEATING_RATE_BASE = 4.0
+            HEATING_RATE_VARIANCE = 3.0
+            FLUCTUATION_RANGE = 1.5
+
+            current_temp = ROOM_TEMPERATURE + (random.random() - 0.5) * 2
+            while True:
+                distance = target_temp - current_temp
+                if abs(distance) > TARGET_THRESHOLD:
+                    heating_rate = HEATING_RATE_BASE + (random.random() - 0.5) * HEATING_RATE_VARIANCE
+                    current_temp += heating_rate
+                    if current_temp > target_temp:
+                        current_temp = target_temp + (random.random() - 0.5) * FLUCTUATION_RANGE
+                else:
+                    current_temp = target_temp + (random.random() - 0.5) * FLUCTUATION_RANGE * 2
+
+                now = datetime.now()
+                yield {
+                    "temp": round(current_temp, 1),
+                    "target_temp": target_temp,
+                    "time": now.strftime("%H:%M:%S"),
+                    "timestamp": int(now.timestamp() * 1000),
+                }
+                await asyncio.sleep(interval_s)
+
+        request_id = str(uuid.uuid4())
+
+        count = 0
+        async for reading in mock_telemetry_data():
+            await broadcast({"type": "telemetry", "request_id": request_id, **reading})
+            count += 1
+            if count >= 100:
+                break
+
+    asyncio.create_task(run())
+    return {"status": "started"}
 
 #####################
 # SSE ENDPOINT
 #####################
 
 
-@app.get("/events/{user_id}")
-async def events(user_id: str, request: Request):
-    """
-    Server-Sent Events stream for a given user_id.
-    Client keeps this open to receive brew events in real time.
-    """
-    if user_id not in SUBSCRIBERS:
-        return Response(
-            content='{"type":"error","error":"not_subscribed"}',
-            media_type="application/json",
-            status_code=403,
-        )
+@app.get("/telemetry/stream")
+async def get_telemetry_data(request: Request, token: str = Query(...)):
+    try:
+        auth.verify_id_token(token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
-    q = get_queue(user_id)
+    queue = asyncio.Queue()
+    SSE_QUEUES.add(queue)
 
     async def sse_generator():
-        yield "data: connected\n\n"
-        while True:
-            if await request.is_disconnected():
-                break
-            try:
-                event = await asyncio.wait_for(q.get(), timeout=15)
-                yield f"data: {json.dumps(event)}\n\n"
-            except asyncio.TimeoutError:
-                yield "data: ping\n\n"
+        yield f"data: {json.dumps({'type':'connected'})}\n\n"
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=15)
+                    yield f"data: {json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"   # keepalive comment
+        finally:
+            SSE_QUEUES.discard(queue)
 
     return StreamingResponse(
         sse_generator(),
@@ -220,13 +258,6 @@ async def brew(request: Request):
 
     target_temperature = msg.get("temperature")
 
-    if user_id not in SUBSCRIBERS:
-        return Response(
-            content='{"type":"error","error":"User not a subscriber"}',
-            media_type="application/json",
-            status_code=403,
-        )
-
     if sender_id != Sender.OVERBREW or msg_type != "brew":
         return Response(
             content='{"type":"error","error":"invalid_message"}',
@@ -269,8 +300,7 @@ async def brew(request: Request):
     request_id = str(uuid.uuid4())
 
     # SSE: let the user know the brew started immediately
-    await publish(
-        user_id,
+    await broadcast(
         {
             "type": "brew_started",
             "request_id": request_id,
@@ -287,8 +317,7 @@ async def brew(request: Request):
     )
 
     # SSE: let the user know the brew finished
-    await publish(
-        user_id,
+    await broadcast(
         {
             "type": "brew_finished",
             "request_id": request_id,
@@ -302,41 +331,6 @@ async def brew(request: Request):
         "request_id": request_id,
         "plan": commands,
     }
-
-
-@app.post("/subscribe")
-async def subscribe(request: Request):
-    """
-    Subscribes a user to the brew service.
-
-    Expected packet format:
-    {
-        "sender_id" : Sender.OVERBREW,
-        "type" : "subscribe",
-        "user_id" : <USER ID>,
-        "enabled" : True | False
-    }
-    """
-
-    try:
-        msg = await request.json()
-    except Exception:
-        return {"error": "invalid_json"}
-
-    user_id = msg.get("user_id")
-    enabled = msg.get("enabled")
-
-    if not isinstance(user_id, str) or not isinstance(enabled, bool):
-        return {"error": "invalid_payload"}
-
-    if enabled:
-        SUBSCRIBERS.add(user_id)
-        get_queue(user_id)
-    else:
-        SUBSCRIBERS.discard(user_id)
-
-    return {"type": "subscription_updated", "user_id": user_id, "enabled": enabled}
-
 
 #####################
 # AUTOBREW ENDPOINTS
@@ -393,12 +387,11 @@ async def continually_send_brew_status(
     # OVERBREW_URL = "https://cafe.miarolfe.com/overbrew"
 
     temp = 10
-    interval_s = 0.25
+    interval_s = 2
 
     # Stream the current temperature to the frontend via Server-side events
     while temp < target_temperature:
-        await publish(
-            user_id,
+        await broadcast(
             {
                 "type": "brew_progress",
                 "request_id": request_id,
@@ -410,8 +403,7 @@ async def continually_send_brew_status(
         await asyncio.sleep(interval_s)
 
     # Streaming the final temperature of the coffee to show that the job is done :D
-    await publish(
-        user_id,
+    await broadcast(
         {
             "type": "brew_progress",
             "request_id": request_id,
@@ -419,16 +411,11 @@ async def continually_send_brew_status(
         },
     )
 
-
-def get_queue(user_id: str):
-    q = SSE_QUEUES.get(user_id)
-    if q is None:
-        q = asyncio.Queue()
-        SSE_QUEUES[user_id] = q
-    return q
-
-
-async def publish(user_id: str, event: dict):
-    if user_id not in SUBSCRIBERS:
-        return
-    await get_queue(user_id).put(event)
+async def broadcast(event: dict):
+    """
+    Broadcasts an event to all subscribed users. Events added 
+    to the user's queue will be picked up by the SSE endpoint 
+    and sent to the frontend.
+    """
+    for queue in list(SSE_QUEUES):
+        await queue.put(event)

@@ -1,33 +1,24 @@
-import { useEffect, useRef, useState } from 'react'
-import type { TemperatureReading } from './Info.types'
-import { MockTemperatureService } from '../../../components/LineChart/mockTemperatureService'
-import {
-  TARGET_TEMPERATURE,
-  NUM_TEMPERATURE_POINTS,
-} from '../../../constants/temperature'
+import { useEffect, useState } from 'react'
+import { TARGET_TEMPERATURE } from '../../../constants/temperature'
 import LineChart from '../../../components/LineChart/LineChart'
 import './Grids.css'
+import { useTelemetryStream } from '../../../hooks/useTelemetryStream'
 
 const Info = () => {
-  const [temperatureData, setTemperatureData] = useState<TemperatureReading[]>(
-    []
-  )
-
-  // TODO: Replace with actual backend service when available
-  const mockServiceRef = useRef(new MockTemperatureService(TARGET_TEMPERATURE))
-
+  const { latest } = useTelemetryStream()
+  const [temperatureData, setTemperatureData] = useState<any[]>([])
   useEffect(() => {
-    const interval = setInterval(() => {
-      // TODO: Replace with actual backend endpoint when available
-      const newReading = mockServiceRef.current.getNextReading()
-      setTemperatureData((prev) => {
-        const updated = [...prev, newReading]
-        return updated.slice(-NUM_TEMPERATURE_POINTS)
-      })
-    }, 2000)
+    if (!latest || latest.type !== 'telemetry') return
 
-    return () => clearInterval(interval)
-  }, [])
+    setTemperatureData((prev) => [
+      ...prev,
+      {
+        time: latest.time,
+        temperature: latest.temp,
+        timestamp: latest.timestamp,
+      },
+    ])
+  }, [latest])
 
   return (
     <div className="grid info-content">
@@ -36,7 +27,10 @@ const Info = () => {
         <div className="card">Card 2</div>
         <div className="card">Card 3</div>
         <div className="card">
-          <LineChart data={temperatureData} target={TARGET_TEMPERATURE} />
+          <LineChart
+            data={temperatureData}
+            target={temperatureData[0]?.target_temp ?? TARGET_TEMPERATURE}
+          />
         </div>
       </div>
     </div>

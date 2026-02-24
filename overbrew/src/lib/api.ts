@@ -1,10 +1,13 @@
-import { auth } from '../firebase/config'
+import { type User } from 'firebase/auth'
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL
+export const BASE_URL = import.meta.env.VITE_API_BASE_URL
+export const SENDER_ID = 2
 
-export const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
-  const user = auth.currentUser
-
+export const apiFetch = async (
+  endpoint: string,
+  user: User,
+  options: RequestInit = {}
+) => {
   if (!user) throw new Error('Not authenticated')
 
   const token = await user.getIdToken(true)

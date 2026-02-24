@@ -1,0 +1,48 @@
+import { useState, useEffect, useRef } from 'react'
+import { useAuth } from './useAuth'
+import { BASE_URL } from '../lib/api'
+
+export const useTelemetryStream = () => {
+  const { user } = useAuth()
+
+  const eventSourceRef = useRef<EventSource | null>(null)
+  const [connected, setConnected] = useState(false)
+  const [latest, setLatest] = useState<any>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const startStream = async () => {
+      if (!user) return
+
+      const token = await user.getIdToken()
+      const url = `${BASE_URL}/telemetry/stream?token=${token}`
+
+      const eventSource = new EventSource(url)
+      eventSourceRef.current = eventSource
+
+      eventSource.onopen = () => {
+        if (!cancelled) setConnected(true)
+      }
+
+      eventSource.onmessage = (e) => {
+        const event = JSON.parse(e.data)
+        setLatest(event)
+      }
+
+      eventSource.onerror = () => {
+        if (!cancelled) setConnected(false)
+      }
+    }
+
+    startStream()
+
+    return () => {
+      cancelled = true
+      eventSourceRef.current?.close()
+      eventSourceRef.current = null
+    }
+  }, [user])
+
+  return { connected, latest }
+}
