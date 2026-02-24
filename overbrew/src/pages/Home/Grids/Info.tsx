@@ -4,12 +4,21 @@ import LineChart from '../../../components/LineChart/LineChart'
 import './Grids.css'
 import { useTelemetryStream } from '../../../hooks/useTelemetryStream'
 
+interface TemperatureData {
+  time: string
+  temperature: number
+  timestamp: number
+  target_temp?: number
+}
+
 const Info = () => {
   const { latest } = useTelemetryStream()
-  const [temperatureData, setTemperatureData] = useState<any[]>([])
+  const [temperatureData, setTemperatureData] = useState<TemperatureData[]>([])
+
   useEffect(() => {
     if (!latest || latest.type !== 'telemetry') return
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTemperatureData((prev) => [
       ...prev,
       {

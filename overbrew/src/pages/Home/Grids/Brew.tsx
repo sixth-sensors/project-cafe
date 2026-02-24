@@ -24,7 +24,9 @@ const Brew = () => {
       <div className="grid brew-right">
         <div className="card">Card 2</div>
         <div className="card">
-          <button onClick={handleStartBrew}>Start Mock Brew</button>
+          <button onClick={handleStartBrew} type="button">
+            Start Mock Brew
+          </button>
         </div>
       </div>
     </div>

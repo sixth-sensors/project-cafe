@@ -2,12 +2,21 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from './useAuth'
 import { BASE_URL } from '../lib/api'
 
+interface TelemetryEvent {
+  type: 'telemetry'
+  request_id: string
+  time: string
+  temp: number
+  target_temp: number
+  timestamp: number
+}
+
 export const useTelemetryStream = () => {
   const { user } = useAuth()
 
   const eventSourceRef = useRef<EventSource | null>(null)
   const [connected, setConnected] = useState(false)
-  const [latest, setLatest] = useState<any>(null)
+  const [latest, setLatest] = useState<TelemetryEvent | null>(null)
 
   useEffect(() => {
     let cancelled = false
