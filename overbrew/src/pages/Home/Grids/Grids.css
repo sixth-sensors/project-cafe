@@ -22,13 +22,41 @@
   grid-template-columns: minmax(300px, 1fr) minmax(600px, 2fr);
 
   & .card {
-    background-color: var(--dark-brown);
+    background-color: var(--dark-grey);
     color: var(--cream);
   }
 }
 
 .brew-right {
   grid-template-rows: 2fr 1fr;
+}
+
+.brew-list-card {
+  display: flex;
+  overflow: hidden;
+}
+
+.brew-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.brew-list-section-title {
+  margin: 0.5rem 0 0;
+}
+
+.brew-list-empty {
+  margin: 0;
+  opacity: 0.8;
+}
+
+::-webkit-scrollbar {
+  display: none;
 }
 
 .info-content {
