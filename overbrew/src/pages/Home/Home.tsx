@@ -31,7 +31,7 @@ const Home = () => {
         primaryColor: 'var(--dark-grey)',
         secondaryColor: 'var(--silver)',
         backgroundColor: 'var(--grey)',
-        textColor: 'white',
+        textColor: '#ffffff',
       },
     },
     {
