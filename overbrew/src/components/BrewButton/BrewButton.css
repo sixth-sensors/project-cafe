@@ -1,0 +1,71 @@
+.brew-button-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: black;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.brew-button-container {
+  padding: 0.5rem 0 0.5rem 0.5rem;
+  background-color: black;
+  width: 100%;
+}
+
+.brew-button {
+  width: 100%;
+  height: 100px;
+  border: none;
+  border-radius: 0.25rem;
+  background-color: var(--blue-grey);
+  color: white;
+  text-align: left;
+
+  &:hover {
+    background-color: hsl(from var(--blue-grey) h s l / 0.8);
+  }
+
+  &:active {
+    background-color: hsl(from var(--blue-grey) h s l / 0.6);
+  }
+}
+
+.brew-button-content {
+  display: flex;
+  padding: 0.5rem 1rem;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.fav-button {
+  height: 70px;
+  aspect-ratio: 1/1;
+  border: none;
+  border-radius: 50%;
+  background-color: var(--silver);
+  margin: 1rem;
+  appearance: none;
+  box-shadow:
+    0 1px 2px #fff,
+    0 -1px 1px hsl(from var(--silver) h s l / 0.8),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.8);
+
+  &:hover {
+    background-color: hsl(from var(--silver) h s l / 0.8);
+  }
+
+  &:checked:hover {
+    background-color: hsl(from var(--silver) h s l / 0.4);
+  }
+
+  &:checked {
+    background-color: hsl(from var(--silver) h s l / 0.6);
+    box-shadow:
+      0 1px 2px #fff,
+      0 -1px 1px hsl(from var(--silver) h s l / 0.2),
+      inset 0 -1px 1px rgba(0, 0, 0, 0.5),
+      inset 0 1px 1px rgba(255, 255, 255, 0.8);
+  }
+}

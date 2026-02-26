@@ -28,10 +28,10 @@ const Home = () => {
       page: Page.Brew,
       label: 'Brew',
       colors: {
-        primaryColor: 'var(--dark-brown)',
-        secondaryColor: 'var(--light-brown)',
-        backgroundColor: 'var(--lighter-brown)',
-        textColor: 'var(--cream)',
+        primaryColor: 'var(--dark-grey)',
+        secondaryColor: 'var(--silver)',
+        backgroundColor: 'var(--grey)',
+        textColor: 'white',
       },
     },
     {
