@@ -52,15 +52,15 @@ const Slider = ({
           }}
         />
         <input
-          id={id}
-          className="slider-input"
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
           aria-label={label}
+          className="slider-input"
+          id={id}
+          max={max}
+          min={min}
           onChange={handleChange}
+          step={step}
+          type="range"
+          value={value}
         />
       </div>
     </div>

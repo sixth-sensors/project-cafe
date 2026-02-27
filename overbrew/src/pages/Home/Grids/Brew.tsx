@@ -127,24 +127,24 @@ const Brew = () => {
         <div className="brew-list">
           <h2>Your Brews</h2>
 
-          {favouriteBrews.length > 0 && (
+          {favouriteBrews.length > 0 ? (
             <>
               <h3 className="brew-list-section-title">Favourites</h3>
               {favouriteBrews.map(
                 ({ id, title, settings, isFavorite, timestamp }) => (
                   <BrewButton
-                    key={id}
-                    title={title}
-                    settings={settings}
                     isFavorite={isFavorite}
-                    timestamp={timestamp}
-                    onToggleFavorite={() => handleToggleFavorite(id)}
+                    key={id}
                     onClick={handleBrewSelect}
+                    onToggleFavorite={() => handleToggleFavorite(id)}
+                    settings={settings}
+                    timestamp={timestamp}
+                    title={title}
                   />
                 )
               )}
             </>
-          )}
+          ) : null}
 
           <h3 className="brew-list-section-title">Recent</h3>
           {recentBrews.length === 0 ? (
@@ -153,13 +153,13 @@ const Brew = () => {
             recentBrews.map(
               ({ id, title, settings, isFavorite, timestamp }) => (
                 <BrewButton
-                  key={id}
-                  title={title}
-                  settings={settings}
                   isFavorite={isFavorite}
-                  timestamp={timestamp}
-                  onToggleFavorite={() => handleToggleFavorite(id)}
+                  key={id}
                   onClick={handleBrewSelect}
+                  onToggleFavorite={() => handleToggleFavorite(id)}
+                  settings={settings}
+                  timestamp={timestamp}
+                  title={title}
                 />
               )
             )
@@ -174,24 +174,24 @@ const Brew = () => {
               <h2>Brew Settings</h2>
               <div className="sliders-container">
                 <Slider
-                  min={60}
-                  max={100}
-                  step={1}
-                  gradientMin="#BFFAFF"
                   gradientMax="#F23232"
-                  value={temperature}
+                  gradientMin="#BFFAFF"
                   label="Temperature (°C)"
+                  max={100}
+                  min={60}
                   onChange={setTemperature}
+                  step={1}
+                  value={temperature}
                 />
                 <Slider
-                  min={0.1}
-                  max={4.0}
-                  step={0.1}
-                  gradientMin="var(--lighter-brown)"
                   gradientMax="var(--dark-brown)"
-                  value={flowRate}
+                  gradientMin="var(--lighter-brown)"
                   label="Flow Rate (g/s)"
+                  max={4.0}
+                  min={0.1}
                   onChange={setFlowRate}
+                  step={0.1}
+                  value={flowRate}
                 />
               </div>
             </div>

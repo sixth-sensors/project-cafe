@@ -23,7 +23,11 @@ const BrewButton = ({
   return (
     <div className="brew-button-wrapper">
       <div className="brew-button-container">
-        <button className="brew-button" onClick={() => onClick(settings)}>
+        <button
+          className="brew-button"
+          onClick={() => onClick(settings)}
+          type="button"
+        >
           <div className="brew-button-content">
             <h2>{title}</h2>
             <p>{`${settings.temperature}°C - ${settings.flowRate.toFixed(1)}g/s`}</p>
@@ -32,10 +36,10 @@ const BrewButton = ({
         </button>
       </div>
       <input
-        className="fav-button"
-        type="checkbox"
         checked={isFavorite}
+        className="fav-button"
         onChange={onToggleFavorite}
+        type="checkbox"
       />
     </div>
   )
