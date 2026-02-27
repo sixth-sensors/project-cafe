@@ -29,6 +29,10 @@
 
 .brew-right {
   grid-template-rows: 2fr 1fr;
+
+  & .card {
+    padding: 1rem;
+  }
 }
 
 .brew-list-card {
@@ -53,6 +57,46 @@
 .brew-list-empty {
   margin: 0;
   opacity: 0.8;
+}
+
+.brew-right .brew-settings {
+  background-color: black;
+}
+
+.brew-settings-screen {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background-color: white;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.settings-header {
+  background-color: var(--blue-grey);
+  height: 20px;
+  width: 100%;
+}
+
+.settings-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+
+  padding: 0.5rem;
+
+  & h2 {
+    color: black;
+  }
+}
+
+.sliders-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: center;
+  gap: 3rem;
 }
 
 ::-webkit-scrollbar {
