@@ -4,6 +4,7 @@ import { useAuth } from '../../../hooks/useAuth'
 import { apiFetch } from '../../../lib/api'
 import BrewButton from '../../../components/BrewButton/BrewButton'
 import Slider from '../../../components/Slider/Slider'
+import { FaPlay } from 'react-icons/fa'
 
 // TODO: remove
 
@@ -196,13 +197,30 @@ const Brew = () => {
             </div>
           </div>
         </div>
-        <div className="card">
-          <h2>Confirm Brew</h2>
-          <div className="brew-summary">
-            <div>Temperature</div>
-            <div>Flow Rate</div>
+        <div className="card brew-preview-card">
+          <div className="brew-preview">
+            <h2>Brew Summary</h2>
+            <div className="brew-preview-settings">
+              <div className="brew-detail">
+                <h2>Brew Name:</h2>
+                <input placeholder="My Brew" />
+              </div>
+              <div className="brew-details">
+                <div className="brew-detail">
+                  <h2>Temperature:</h2>
+                  <p>{`${temperature}°C`}</p>
+                </div>
+                <div className="brew-detail">
+                  <h2>Flow Rate:</h2>
+                  <p>{`${flowRate.toFixed(1)}g/s`}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="brew-start-panel">
+            <h2>Start Brew</h2>
             <button onClick={handleStartBrew} type="button">
-              Start Mock Brew
+              <FaPlay size={24} />
             </button>
           </div>
         </div>
