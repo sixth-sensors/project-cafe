@@ -32,6 +32,7 @@ const Home = () => {
         secondaryColor: 'var(--silver)',
         backgroundColor: 'var(--grey)',
         textColor: '#ffffff',
+        activeTextColor: '#000000',
       },
     },
     {
@@ -56,6 +57,7 @@ const Home = () => {
           backgroundColor: currentColors?.backgroundColor,
           '--card-bg': currentColors?.primaryColor,
           '--text-color': currentColors?.textColor,
+          '--active-text-color': currentColors?.activeTextColor,
         } as React.CSSProperties
       }
     >
