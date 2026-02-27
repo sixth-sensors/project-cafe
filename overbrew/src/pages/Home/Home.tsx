@@ -28,10 +28,11 @@ const Home = () => {
       page: Page.Brew,
       label: 'Brew',
       colors: {
-        primaryColor: 'var(--dark-brown)',
-        secondaryColor: 'var(--light-brown)',
-        backgroundColor: 'var(--lighter-brown)',
-        textColor: 'var(--cream)',
+        primaryColor: 'var(--dark-grey)',
+        secondaryColor: 'var(--silver)',
+        backgroundColor: 'var(--grey)',
+        textColor: '#ffffff',
+        activeTextColor: '#000000',
       },
     },
     {
@@ -56,6 +57,7 @@ const Home = () => {
           backgroundColor: currentColors?.backgroundColor,
           '--card-bg': currentColors?.primaryColor,
           '--text-color': currentColors?.textColor,
+          '--active-text-color': currentColors?.activeTextColor,
         } as React.CSSProperties
       }
     >

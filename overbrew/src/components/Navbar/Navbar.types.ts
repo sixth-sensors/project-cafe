@@ -21,5 +21,6 @@ export interface NavLink {
     secondaryColor: string
     backgroundColor?: string
     textColor: string
+    activeTextColor?: string
   }
 }

@@ -47,7 +47,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-color, #5d4037);
+  color: var(--text-color);
   font-weight: 900;
   width: 100px;
   height: 44px;
@@ -69,6 +69,6 @@
 }
 
 .navbar a.active {
-  color: #fff;
+  color: var(--active-text-color, #ffffff);
   anchor-name: --active-link;
 }

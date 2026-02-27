@@ -1,0 +1,68 @@
+.slider-root {
+  width: 100%;
+  padding: 0 1.5rem;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.slider-label {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: black;
+  margin-bottom: 2rem;
+}
+
+.slider-thumb-label {
+  position: absolute;
+  bottom: calc(100% + 0.35rem);
+  transform: translateX(-50%);
+  font-size: 1rem;
+  font-weight: 700;
+  color: black;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.slider-track-wrapper {
+  position: relative;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  margin-top: 1.75rem;
+}
+
+.slider-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 10px;
+  border-radius: 5px;
+}
+
+.slider-input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  z-index: 1;
+}
+
+/* WebKit */
+.slider-input::-webkit-slider-runnable-track {
+  background: transparent;
+}
+
+.slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--silver);
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
