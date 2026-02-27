@@ -1,21 +1,21 @@
-import { useState, useCallback, useId } from 'react'
+import { useCallback, useId } from 'react'
 import './Slider.css'
 
 interface SliderProps {
+  value: number
   min?: number
   max?: number
-  defaultValue?: number
   gradientMin?: string
   gradientMax?: string
   step?: number
-  onChange?: (value: number) => void
+  onChange: (value: number) => void
   label?: string
 }
 
 const Slider = ({
+  value,
   min = 0,
   max = 100,
-  defaultValue,
   gradientMin = 'blue',
   gradientMax = 'red',
   step = 1,
@@ -23,14 +23,12 @@ const Slider = ({
   label = 'Slider',
 }: SliderProps) => {
   const thumbSize = 20
-  const [value, setValue] = useState(defaultValue ?? min)
   const id = useId()
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const v = Number(e.target.value)
-      setValue(v)
-      onChange?.(v)
+      onChange(v)
     },
     [onChange]
   )

@@ -7,10 +7,15 @@ import Slider from '../../../components/Slider/Slider'
 
 // TODO: remove
 
+export type BrewSettings = {
+  temperature: number
+  flowRate: number
+}
+
 type Brew = {
   id: string
   title: string
-  details: string
+  settings: BrewSettings
   isFavorite: boolean
   timestamp: string
 }
@@ -19,42 +24,60 @@ const mockBrewData = [
   {
     id: 'mock-brew-1',
     title: 'Mock Brew',
-    details: 'This is a mock brew for testing purposes.',
+    settings: {
+      temperature: 96,
+      flowRate: 2.5,
+    },
     isFavorite: true,
     timestamp: '2026-02-26T18:01:45Z',
   },
   {
     id: 'mock-brew-2',
     title: 'Mock Brew',
-    details: 'This is a mock brew for testing purposes.',
+    settings: {
+      temperature: 95,
+      flowRate: 2.4,
+    },
     isFavorite: true,
     timestamp: '2026-02-26T18:01:44Z',
   },
   {
     id: 'mock-brew-3',
     title: 'Mock Brew',
-    details: 'This is a mock brew for testing purposes.',
+    settings: {
+      temperature: 94,
+      flowRate: 2.3,
+    },
     isFavorite: false,
     timestamp: '2026-02-26T18:01:43Z',
   },
   {
     id: 'mock-brew-4',
     title: 'Mock Brew',
-    details: 'This is a mock brew for testing purposes.',
+    settings: {
+      temperature: 93,
+      flowRate: 2.2,
+    },
     isFavorite: false,
     timestamp: '2026-02-26T18:01:42Z',
   },
   {
     id: 'mock-brew-5',
     title: 'Mock Brew',
-    details: 'This is a mock brew for testing purposes.',
+    settings: {
+      temperature: 92,
+      flowRate: 2.1,
+    },
     isFavorite: false,
     timestamp: '2026-02-26T18:01:41Z',
   },
   {
     id: 'mock-brew-6',
     title: 'Mock Brew',
-    details: 'This is a mock brew for testing purposes.',
+    settings: {
+      temperature: 91,
+      flowRate: 2.0,
+    },
     isFavorite: false,
     timestamp: '2026-02-26T18:01:40Z',
   },
@@ -77,6 +100,11 @@ const Brew = () => {
         brew.id === id ? { ...brew, isFavorite: !brew.isFavorite } : brew
       )
     )
+  }
+
+  const handleBrewSelect = (settings: BrewSettings) => {
+    setTemperature(settings.temperature)
+    setFlowRate(settings.flowRate)
   }
 
   const handleStartBrew = async () => {
@@ -102,14 +130,15 @@ const Brew = () => {
             <>
               <h3 className="brew-list-section-title">Favourites</h3>
               {favouriteBrews.map(
-                ({ id, title, details, isFavorite, timestamp }) => (
+                ({ id, title, settings, isFavorite, timestamp }) => (
                   <BrewButton
                     key={id}
                     title={title}
-                    details={details}
+                    settings={settings}
                     isFavorite={isFavorite}
                     timestamp={timestamp}
                     onToggleFavorite={() => handleToggleFavorite(id)}
+                    onClick={handleBrewSelect}
                   />
                 )
               )}
@@ -120,16 +149,19 @@ const Brew = () => {
           {recentBrews.length === 0 ? (
             <p className="brew-list-empty">No recent brews.</p>
           ) : (
-            recentBrews.map(({ id, title, details, isFavorite, timestamp }) => (
-              <BrewButton
-                key={id}
-                title={title}
-                details={details}
-                isFavorite={isFavorite}
-                timestamp={timestamp}
-                onToggleFavorite={() => handleToggleFavorite(id)}
-              />
-            ))
+            recentBrews.map(
+              ({ id, title, settings, isFavorite, timestamp }) => (
+                <BrewButton
+                  key={id}
+                  title={title}
+                  settings={settings}
+                  isFavorite={isFavorite}
+                  timestamp={timestamp}
+                  onToggleFavorite={() => handleToggleFavorite(id)}
+                  onClick={handleBrewSelect}
+                />
+              )
+            )
           )}
         </div>
       </div>
@@ -146,7 +178,7 @@ const Brew = () => {
                   step={1}
                   gradientMin="#BFFAFF"
                   gradientMax="#F23232"
-                  defaultValue={temperature}
+                  value={temperature}
                   label="Temperature (°C)"
                   onChange={setTemperature}
                 />
@@ -156,7 +188,7 @@ const Brew = () => {
                   step={0.1}
                   gradientMin="var(--lighter-brown)"
                   gradientMax="var(--dark-brown)"
-                  defaultValue={flowRate}
+                  value={flowRate}
                   label="Flow Rate (g/s)"
                   onChange={setFlowRate}
                 />

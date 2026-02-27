@@ -1,18 +1,21 @@
 import './BrewButton.css'
+import type { BrewSettings } from '../../pages/Home/Grids/Brew'
 
 type BrewButtonProps = {
   title: string
-  details: string
+  settings: BrewSettings
   timestamp: string
   isFavorite: boolean
+  onClick: (settings: BrewSettings) => void
   onToggleFavorite: () => void
 }
 
 const BrewButton = ({
   title,
-  details,
+  settings,
   timestamp,
   isFavorite,
+  onClick,
   onToggleFavorite,
 }: BrewButtonProps) => {
   const formattedTimestamp = new Date(timestamp).toLocaleString()
@@ -20,10 +23,10 @@ const BrewButton = ({
   return (
     <div className="brew-button-wrapper">
       <div className="brew-button-container">
-        <button className="brew-button">
+        <button className="brew-button" onClick={() => onClick(settings)}>
           <div className="brew-button-content">
             <h2>{title}</h2>
-            <p>{details}</p>
+            <p>{`${settings.temperature}°C - ${settings.flowRate.toFixed(1)}g/s`}</p>
             <p className="brew-button-timestamp">{formattedTimestamp}</p>
           </div>
         </button>
