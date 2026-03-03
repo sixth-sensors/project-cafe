@@ -36,6 +36,7 @@ class Homebrew:
         "sender_id": Sender.HOMEBREW,
         "type": "telemetry",
         "temp": 0.0,
+        "flow_rate": 0.0,
     }
     POLLING_INTERVAL_SECONDS = 1.0
     # Degrees C band to prevent rapid power cycling
@@ -230,6 +231,10 @@ class Homebrew:
                 print("Msg temperature is not float, invalidating msg")
                 return False
 
+            if type(msg["flow_rate"]) is not float:
+                print("Msg flow rate is not float, invalidating msg")
+                return False
+
             return True
 
         if msg["type"] == "brew":
@@ -372,6 +377,7 @@ class Homebrew:
                     "sender_id": Sender.HOMEBREW,
                     "type": "telemetry",
                     "temp": current_temperature,
+                    "flow_rate": 0.0,
                 }
 
                 if self._validate_msg(telemetry_msg):
