@@ -1,7 +1,7 @@
 import './Grids.css'
 import { useState } from 'react'
 import { useAuth } from '../../../hooks/useAuth'
-import { apiFetch } from '../../../lib/api'
+import { apiFetch, SENDER_ID } from '../../../lib/api'
 import BrewButton from '../../../components/BrewButton/BrewButton'
 import Slider from '../../../components/Slider/Slider'
 import { FaPlay } from 'react-icons/fa'
@@ -112,8 +112,18 @@ const Brew = () => {
     if (!user) return
 
     try {
-      // TODO: Trigger a mock brew for now
-      await apiFetch('/mock-brew', user, { method: 'POST' })
+      await apiFetch('/brew', user, {
+        method: 'POST',
+        body: JSON.stringify({
+          sender_id: SENDER_ID,
+          type: 'brew',
+          user_id: user.uid,
+          create_profile: false,
+          temperature,
+          flow_rate: flowRate,
+          intent: `Brew at ${temperature}°C, ${flowRate}g/s`,
+        }),
+      })
       window.location.hash = '#info'
     } catch (error) {
       console.error('Error starting brew:', error)
