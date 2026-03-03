@@ -8,7 +8,7 @@ from datetime import datetime
 
 import firebase_admin
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Request, Response, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -24,6 +24,9 @@ BREW_JOBS: dict[str, dict] = {}
 SSE_QUEUES: set[asyncio.Queue] = (
     set()
 )  # List of queues for all connected SSE clients. Each client has its own queue.
+
+# Active brew state — set by /brew, read by /telemetry to send instructions to HOMEBREW
+ACTIVE_BREW: dict | None = None
 
 # TODO: DELETE HARDCODED DUMMY JOB
 BREW_JOBS["dummy-job"] = {
@@ -218,8 +221,44 @@ async def receive_telemetry(request: Request):
             status_code=403
         )
 
-    # TODO: We should modify this response to contain physical instructions for
-    # Homebrew to take, given the telemetry readings.
+    global ACTIVE_BREW  # TODO: Maybe encapsulating state better, FastAPI has some good stuff for this
+    if ACTIVE_BREW is not None:
+        await broadcast(
+            {
+                "type": "brew_progress",
+                "request_id": ACTIVE_BREW["request_id"],
+                "temp": msg["temp"],
+                "target_temp": ACTIVE_BREW["target_temperature"],
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "timestamp": int(datetime.now().timestamp() * 1000),
+            }
+        )
+
+        if msg["temp"] is not None and msg["temp"] >= ACTIVE_BREW["target_temperature"]:
+            await broadcast(
+                {
+                    "type": "brew_finished",
+                    "request_id": ACTIVE_BREW["request_id"],
+                }
+            )
+            ACTIVE_BREW = None
+
+    return Packet.ack(Sender.AWAYBREW).to_response()
+
+
+# Running a web server on homebrew is unviable so it just polls every second or so for the current brew
+@app.get("/homebrew/brew")
+async def get_homebrew_brew():
+    """
+    Polled by Homebrew to check for pending brew commands.
+    Returns the active brew target or an ACK if no brew is active.
+    """
+    if ACTIVE_BREW is not None:
+        return Packet(
+            sender_id=Sender.AWAYBREW,
+            type="brew",
+            payload={"target_temperature": ACTIVE_BREW["target_temperature"]},
+        ).to_response()
 
     return Packet.ack(Sender.AWAYBREW).to_response()
 
@@ -271,6 +310,7 @@ async def brew(request: Request):
     intent = msg.get("intent")
 
     target_temperature = msg.get("temperature")
+    flow_rate = msg.get("flow_rate")
 
     if sender_id != Sender.OVERBREW or msg_type != "brew":
         return Response(
@@ -283,6 +323,7 @@ async def brew(request: Request):
         not isinstance(create_profile, bool)
         or not isinstance(intent, str)
         or not isinstance(target_temperature, (float, int))
+        or not isinstance(flow_rate, (float, int))
         or not sender_id
         or not msg_type
         or not user_id
@@ -313,6 +354,14 @@ async def brew(request: Request):
     commands = []  # List of commands that will be taken by the brew.
     request_id = str(uuid.uuid4())
 
+    global ACTIVE_BREW
+    ACTIVE_BREW = {
+        "request_id": request_id,
+        "target_temperature": float(target_temperature),
+        "flow_rate": float(flow_rate),
+        "started_at": datetime.now(),
+    }
+
     # SSE: let the user know the brew started immediately
     await broadcast(
         {
@@ -325,25 +374,10 @@ async def brew(request: Request):
     if create_profile:
         pass
 
-    # DUMMY CODE
-    await continually_send_brew_status(
-        user_id=user_id, request_id=request_id, target_temperature=target_temperature
-    )
-
-    # SSE: let the user know the brew finished
-    await broadcast(
-        {
-            "type": "brew_finished",
-            "request_id": request_id,
-            "plan": commands,
-        },
-    )
-
     return {
         "sender_id": Sender.AWAYBREW,
-        "type": "brew_finished",
+        "type": "brew_started",
         "request_id": request_id,
-        "plan": commands,
     }
 
 
