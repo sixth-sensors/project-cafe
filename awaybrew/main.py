@@ -225,7 +225,7 @@ async def receive_telemetry(request: Request):
     if ACTIVE_BREW is not None:
         await broadcast(
             {
-                "type": "brew_progress",
+                "type": "telemetry",
                 "request_id": ACTIVE_BREW["request_id"],
                 "temp": msg["temp"],
                 "target_temp": ACTIVE_BREW["target_temperature"],
