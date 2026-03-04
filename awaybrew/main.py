@@ -5,7 +5,6 @@ import json
 import os
 import uuid
 from datetime import datetime
-from typing import Any, Dict, Optional, cast
 
 import firebase_admin
 from dotenv import load_dotenv
