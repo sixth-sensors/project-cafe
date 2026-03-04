@@ -1,0 +1,340 @@
+packages:
+  minimal: !include minimal.yaml
+
+esphome:
+  on_boot:
+    priority: 300
+    then:
+      #Signal to the template switches that their initial values have been loaded
+      - lambda: |
+          if (id(voltage_multiply) <= 0) id(voltage_multiply) = 0.3;
+          if (id(power_multiply) <= 0) id(power_multiply) = 0.133;
+          if (id(current_multiply) <= 0) id(current_multiply) = 0.85;
+      - globals.set:
+          id: setupComplete
+          value: "true"
+
+wifi:
+  power_save_mode: high
+
+time:
+  - platform: homeassistant
+    timezone: Europe/London
+
+api:
+  services:
+    - service: calibrate_voltage
+      variables:
+        actual_value: float
+      then:
+        - lambda: |-
+            id(voltage_multiply) = actual_value / id(voltage).raw_state;
+        - number.set:
+            id: voltage_factor
+            value: !lambda "return id(voltage_multiply);"
+
+    - service: calibrate_power
+      variables:
+        actual_value: float
+      then:
+        - lambda: |-
+            id(power_multiply) = actual_value / id(power).raw_state;
+        - number.set:
+            id: power_factor
+            value: !lambda "return id(power_multiply);"
+
+    - service: calibrate_current
+      variables:
+        actual_value: float
+      then:
+        - lambda: |-
+            id(current_multiply) = actual_value / id(current).raw_state;
+        - number.set:
+            id: current_factor
+            value: !lambda "return id(current_multiply);"
+
+globals:
+  - id: voltage_multiply
+    type: float
+    restore_value: true
+    initial_value: "0.3"
+
+  - id: power_multiply
+    type: float
+    restore_value: true
+    initial_value: "0.133"
+
+  - id: current_multiply
+    type: float
+    restore_value: true
+    initial_value: "0.805"
+
+  - id: setupComplete
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+binary_sensor:
+  # Push Button (Toggles Relay When Pressed)
+  - platform: gpio
+    pin:
+      number: GPIO3
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Button"
+    on_click:
+      - max_length: 1s
+        then:
+          if:
+            condition:
+              switch.is_off: disable_button
+            then:
+              switch.toggle: relay
+
+      - min_length: 1.5s
+        max_length: 5s
+        then:
+          switch.toggle: disable_led
+
+      - min_length: 8s
+        max_length: 12s
+        then:
+          switch.toggle: disable_button
+
+  - platform: status
+    name: "Server Status"
+
+switch:
+  # Relay (As Switch)
+  - platform: gpio
+    name: ""
+    icon: "mdi:${main_icon}"
+    pin: GPIO14
+    id: relay
+    restore_mode: "${default_state}"
+    on_turn_on:
+      if:
+        condition:
+          switch.is_off: disable_led
+        then:
+          light.turn_on: led
+    on_turn_off:
+      - light.turn_off: led
+
+  - platform: template
+    name: "Disable LED"
+    id: disable_led
+    icon: "mdi:led-variant-off"
+    restore_mode: "${disable_led_default_state}"
+    optimistic: true
+    on_turn_on:
+      - if:
+          condition:
+            lambda: "return id(setupComplete) == true;"
+          then:
+            #Flash twice
+            - light.turn_off: led
+            - delay: 0.15s
+            - light.turn_on: led
+            - delay: 0.15s
+            - light.turn_off: led
+            - delay: 0.15s
+            - light.turn_on: led
+            - delay: 0.15s
+      #Final state
+      - light.turn_off: led
+    on_turn_off:
+      - if:
+          condition:
+            lambda: "return id(setupComplete) == true;"
+          then:
+            #Flash twice
+            - light.turn_on: led
+            - delay: 0.15s
+            - light.turn_off: led
+            - delay: 0.15s
+            - light.turn_on: led
+            - delay: 0.15s
+            - light.turn_off: led
+            - delay: 1s
+      #Final state
+      - if:
+          condition:
+            switch.is_on: relay
+          then:
+            light.turn_on: led
+
+  - platform: template
+    name: "Disable Button"
+    id: disable_button
+    icon: "mdi:toggle-switch-off-outline"
+    restore_mode: "${disable_button_default_state}"
+    optimistic: true
+    on_turn_on:
+      - if:
+          condition:
+            lambda: "return id(setupComplete) == true;"
+          then:
+            #Flash thrice
+            - light.turn_off: led
+            - delay: 0.15s
+            - light.turn_on: led
+            - delay: 0.15s
+            - light.turn_off: led
+            - delay: 0.15s
+            - light.turn_on: led
+            - delay: 0.15s
+            - light.turn_off: led
+            - delay: 0.15s
+            - light.turn_on: led
+            - delay: 0.15s
+        #Final state
+      - if:
+          condition:
+            or:
+              - switch.is_off: relay
+              - switch.is_on: disable_led
+          then:
+            light.turn_off: led
+    on_turn_off:
+      - if:
+          condition:
+            lambda: "return id(setupComplete) == true;"
+          then:
+            #Flash thrice
+            - light.turn_on: led
+            - delay: 0.15s
+            - light.turn_off: led
+            - delay: 0.15s
+            - light.turn_on: led
+            - delay: 0.15s
+            - light.turn_off: led
+            - delay: 0.15s
+            - light.turn_on: led
+            - delay: 0.15s
+            - light.turn_off: led
+            - delay: 1s
+      #Final state
+      - if:
+          condition:
+            - switch.is_on: relay
+            - switch.is_off: disable_led
+          then:
+            light.turn_on: led
+
+sensor:
+  # WiFi Signal Sensor
+  - platform: wifi_signal
+    name: "WiFi Status"
+    update_interval: 60s
+
+  # Power Monitoring
+  - platform: hlw8012
+    id: power_monitor
+    sel_pin:
+      number: GPIO12
+      inverted: true
+    cf_pin: GPIO4
+    cf1_pin: GPIO5
+    update_interval: 10s
+
+    voltage:
+      name: "Voltage"
+      id: voltage
+      unit_of_measurement: V
+      accuracy_decimals: 1
+      filters:
+        - lambda: return x * id(voltage_multiply);
+
+    power:
+      name: "Power"
+      id: power
+      unit_of_measurement: W
+      accuracy_decimals: 0
+      filters:
+        - lambda: return x * id(power_multiply);
+
+    current:
+      name: "Current"
+      id: current
+      unit_of_measurement: A
+      accuracy_decimals: 3
+      filters:
+        - lambda: return x * id(current_multiply);
+
+  # Total daily energy sensor
+  - platform: total_daily_energy
+    name: "Daily Energy"
+    device_class: energy
+    power_id: power
+    restore: false
+    filters:
+      # Multiplication factor from W to kW is 0.001
+      - multiply: 0.001
+    unit_of_measurement: kWh
+
+# Make calibration factor data readable/set-able from home assistant
+number:
+  - platform: template
+    name: "Voltage Calibration Factor"
+    id: voltage_factor
+    icon: "mdi:sine-wave"
+    min_value: 0
+    max_value: 10
+    step: 0.001
+    entity_category: diagnostic
+    mode: box
+    lambda: |-
+      return id(voltage_multiply);
+    set_action:
+      lambda: |-
+        id(voltage_multiply) = x;
+
+  - platform: template
+    name: "Power Calibration Factor"
+    id: power_factor
+    icon: "mdi:flash"
+    min_value: 0
+    max_value: 10
+    step: 0.001
+    entity_category: diagnostic
+    mode: box
+    lambda: |-
+      return id(power_multiply);
+    set_action:
+      lambda: |-
+        id(power_multiply) = x;
+
+  - platform: template
+    name: "Current Calibration Factor"
+    id: current_factor
+    icon: "mdi:current-ac"
+    min_value: 0
+    max_value: 10
+    step: 0.001
+    entity_category: diagnostic
+    mode: box
+    lambda: |-
+      return id(current_multiply);
+    set_action:
+      lambda: |-
+        id(current_multiply) = x;
+
+# Relay State LED
+output:
+  - platform: esp8266_pwm
+    id: state_led
+    pin:
+      number: GPIO13
+      inverted: true
+
+light:
+  - platform: binary
+    output: state_led
+    id: led
+
+button:
+  - platform: restart
+    name: "Restart"
+  - platform: factory_reset
+    name: "Restart with Factory Default Settings"

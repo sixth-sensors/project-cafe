@@ -8,7 +8,7 @@ from datetime import datetime
 
 import firebase_admin
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Request, Response, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -19,14 +19,16 @@ from utils.sender import Sender
 # Load environment variables
 load_dotenv()
 
+app = FastAPI()
+
 # TODO: STORE THESE IN DATABREW
-BREW_JOBS: dict[str, dict] = {}
-SSE_QUEUES: set[asyncio.Queue] = (
+app.state.BREW_JOBS = {}
+app.state.SSE_QUEUES = (
     set()
 )  # List of queues for all connected SSE clients. Each client has its own queue.
 
 # TODO: DELETE HARDCODED DUMMY JOB
-BREW_JOBS["dummy-job"] = {
+app.state.BREW_JOBS["dummy-job"] = {
     "state": "queued",
     "intent": "make a coffee",
     "plan": [
@@ -36,7 +38,8 @@ BREW_JOBS["dummy-job"] = {
     "explanation": "Test job generated for debugging",
 }
 
-app = FastAPI()
+# Active brew state — set by /brew, read by /telemetry to send instructions to HOMEBREW
+app.state.ACTIVE_BREW = None
 
 app.add_middleware(
     CORSMiddleware,
@@ -126,12 +129,10 @@ async def mock_brew(token: dict = Depends(verify_token)):
                         target_temp + (random.random() - 0.5) * FLUCTUATION_RANGE * 2
                     )
 
-                now = datetime.now()
                 yield {
                     "temp": round(current_temp, 1),
                     "target_temp": target_temp,
-                    "time": now.strftime("%H:%M:%S"),
-                    "timestamp": int(now.timestamp() * 1000),
+                    "timestamp": int(datetime.now().timestamp() * 1000),
                 }
                 await asyncio.sleep(interval_s)
 
@@ -161,7 +162,7 @@ async def get_telemetry_data(request: Request, token: str = Query(...)):
         raise HTTPException(status_code=401, detail="Invalid token")
 
     queue = asyncio.Queue()
-    SSE_QUEUES.add(queue)
+    app.state.SSE_QUEUES.add(queue)
 
     async def sse_generator():
         yield f"data: {json.dumps({'type': 'connected'})}\n\n"
@@ -175,7 +176,7 @@ async def get_telemetry_data(request: Request, token: str = Query(...)):
                 except asyncio.TimeoutError:
                     yield ": ping\n\n"  # keepalive comment
         finally:
-            SSE_QUEUES.discard(queue)
+            app.state.SSE_QUEUES.discard(queue)
 
     return StreamingResponse(
         sse_generator(),
@@ -218,8 +219,47 @@ async def receive_telemetry(request: Request):
             status_code=403
         )
 
-    # TODO: We should modify this response to contain physical instructions for
-    # Homebrew to take, given the telemetry readings.
+    # app.ACTIVE_BREW  # TODO: Maybe encapsulating state better, FastAPI has some good stuff for this
+    if app.state.ACTIVE_BREW is not None:
+        await broadcast(
+            {
+                "type": "telemetry",
+                "request_id": app.state.ACTIVE_BREW["request_id"],
+                "temp": msg["temp"],
+                "target_temp": app.state.ACTIVE_BREW["target_temperature"],
+                "timestamp": int(datetime.now().timestamp() * 1000),
+            }
+        )
+
+        if (
+            msg["temp"] is not None
+            and msg["temp"] >= app.state.ACTIVE_BREW["target_temperature"]
+        ):
+            await broadcast(
+                {
+                    "type": "brew_finished",
+                    "request_id": app.state.ACTIVE_BREW["request_id"],
+                }
+            )
+            app.state.ACTIVE_BREW = None
+
+    return Packet.ack(Sender.AWAYBREW).to_response()
+
+
+# Running a web server on homebrew is unviable so it just polls every second or so for the current brew
+@app.get("/homebrew/brew")
+async def get_homebrew_brew():
+    """
+    Polled by Homebrew to check for pending brew commands.
+    Returns the active brew target or an ACK if no brew is active.
+    """
+
+    if app.state.ACTIVE_BREW is not None:
+        return Packet(
+            sender_id=Sender.AWAYBREW,
+            type="brew",
+            payload={"target_temperature": app.state.ACTIVE_BREW["target_temperature"]},
+        ).to_response()
 
     return Packet.ack(Sender.AWAYBREW).to_response()
 
@@ -271,6 +311,7 @@ async def brew(request: Request):
     intent = msg.get("intent")
 
     target_temperature = msg.get("temperature")
+    flow_rate = msg.get("flow_rate")
 
     if sender_id != Sender.OVERBREW or msg_type != "brew":
         return Response(
@@ -283,6 +324,7 @@ async def brew(request: Request):
         not isinstance(create_profile, bool)
         or not isinstance(intent, str)
         or not isinstance(target_temperature, (float, int))
+        or not isinstance(flow_rate, (float, int))
         or not sender_id
         or not msg_type
         or not user_id
@@ -311,7 +353,15 @@ async def brew(request: Request):
     #####
 
     commands = []  # List of commands that will be taken by the brew.
+    print(commands)
     request_id = str(uuid.uuid4())
+
+    app.state.ACTIVE_BREW = {
+        "request_id": request_id,
+        "target_temperature": float(target_temperature),
+        "flow_rate": float(flow_rate),
+        "started_at": datetime.now(),
+    }
 
     # SSE: let the user know the brew started immediately
     await broadcast(
@@ -325,25 +375,10 @@ async def brew(request: Request):
     if create_profile:
         pass
 
-    # DUMMY CODE
-    await continually_send_brew_status(
-        user_id=user_id, request_id=request_id, target_temperature=target_temperature
-    )
-
-    # SSE: let the user know the brew finished
-    await broadcast(
-        {
-            "type": "brew_finished",
-            "request_id": request_id,
-            "plan": commands,
-        },
-    )
-
     return {
         "sender_id": Sender.AWAYBREW,
-        "type": "brew_finished",
+        "type": "brew_started",
         "request_id": request_id,
-        "plan": commands,
     }
 
 
@@ -367,7 +402,7 @@ async def brew_status(request_id: str):
     }
     """
 
-    job = BREW_JOBS.get(request_id)
+    job = app.state.BREW_JOBS.get(request_id)
     if not job:
         return Packet.error(Sender.AWAYBREW, "unknown_request_id").to_response(
             status_code=404
@@ -433,5 +468,5 @@ async def broadcast(event: dict):
     to the user's queue will be picked up by the SSE endpoint
     and sent to the frontend.
     """
-    for queue in list(SSE_QUEUES):
+    for queue in list(app.state.SSE_QUEUES):
         await queue.put(event)
