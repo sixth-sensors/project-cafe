@@ -12,8 +12,10 @@ import umsgpack
 
 
 class Sender:
+    AWAYBREW = 0
     HOMEBREW = 1
-    AWAYBREW = 2
+    OVERBREW = 2
+    AUTOBREW = 3
 
 
 class Homebrew:
@@ -40,8 +42,8 @@ class Homebrew:
     }
     POLLING_INTERVAL_SECONDS = 1.0
     # Degrees C band to prevent rapid power cycling
-    ACCEPTABLE_MIN_TEMPERATURE_DEGREES_CELSIUS = 20.0  # temporary value
-    ACCEPTABLE_MAX_TEMPERATURE_DEGREES_CELSIUS = 40.0  # temporary value
+    ACCEPTABLE_MIN_TEMPERATURE_DEGREES_CELSIUS = 0.0  # temporary value
+    ACCEPTABLE_MAX_TEMPERATURE_DEGREES_CELSIUS = 100.0  # temporary value
     ACCEPTABLE_TEMPERATURE_MARGIN_DEGREES_CELSIUS = 1.0
 
     def __init__(self):
@@ -191,23 +193,28 @@ class Homebrew:
 
         def validate_brew_msg(brew_msg):
             valid_keys = set(self.BREW_MSG_SCHEMA.keys())
-            are_keys_valid = set(msg.keys()) == valid_keys
+            are_keys_valid = set(brew_msg.keys()) == valid_keys
             if not are_keys_valid:
                 return False
 
-            is_sender_valid = brew_msg["sender_id"] = self.BREW_MSG_SCHEMA["sender_id"]
+            is_sender_valid = int(brew_msg["sender_id"]) == int(
+                self.BREW_MSG_SCHEMA["sender_id"]
+            )
+
             if not is_sender_valid:
                 print("Sender ID is invalid - brew msgs must come from AWAYBREW")
                 return False
 
-            if type(msg["target_temperature"]) is not float:
+            if type(brew_msg["target_temperature"]) is not float:
+                print("Target temperature is not float")
                 return False
 
-            target_temperature = msg["target_temperature"]
+            target_temperature = brew_msg["target_temperature"]
             if (
                 target_temperature < self.ACCEPTABLE_MIN_TEMPERATURE_DEGREES_CELSIUS
                 or target_temperature > self.ACCEPTABLE_MAX_TEMPERATURE_DEGREES_CELSIUS
             ):
+                print("Invalid target temperature")
                 return False
 
             return True
@@ -215,23 +222,23 @@ class Homebrew:
         def validate_telemetry_msg(telemetry_msg):
             valid_keys = set(self.TELEMETRY_MSG_SCHEMA.keys())
 
-            is_sender_valid = telemetry_msg["sender_id"] = self.TELEMETRY_MSG_SCHEMA[
-                "sender_id"
-            ]
+            is_sender_valid = (
+                telemetry_msg["sender_id"] == self.TELEMETRY_MSG_SCHEMA["sender_id"]
+            )
             if not is_sender_valid:
                 print("Sender ID is invalid - telemetry msgs must come from HOMEBREW")
                 return False
 
-            are_keys_valid = set(msg.keys()) == valid_keys
+            are_keys_valid = set(telemetry_msg.keys()) == valid_keys
             if not are_keys_valid:
                 print("Msg does not match schema, invalidating msg")
                 return False
 
-            if type(msg["temp"]) is not float:
+            if type(telemetry_msg["temp"]) is not float:
                 print("Msg temperature is not float, invalidating msg")
                 return False
 
-            if type(msg["flow_rate"]) is not float:
+            if type(telemetry_msg["flow_rate"]) is not float:
                 print("Msg flow rate is not float, invalidating msg")
                 return False
 
@@ -367,6 +374,7 @@ class Homebrew:
         print("--- HOMEBREW ---")
 
         self._setup_connectivity()
+        self._set_plug_enabled(False)
 
         # Main loop
         while True:
