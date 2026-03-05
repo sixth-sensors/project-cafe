@@ -19,6 +19,10 @@ CS7NS2 - Internet of Things group project
 
 [`overbrew` README](overbrew/README.md)
 
+### `plugbrew`: controls smart plug
+
+[`plugbrew` README](plugbrew/README.md)
+
 ## Infrastructure deployment
 to update the deployment from the project.yml file, run:
 ```bash
