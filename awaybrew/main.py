@@ -15,6 +15,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from firebase_admin import auth, credentials
 from utils.packet import Packet
 from utils.sender import Sender
+import mysql.connector
 
 # Load environment variables
 load_dotenv()
@@ -66,6 +67,19 @@ firebase_admin.initialize_app(cred)
 print("Firebase Admin initialized successfully")
 
 bearer_scheme = HTTPBearer()
+
+# Initialize Databrew connection
+databrew_connection = mysql.connector.connect(
+    host=os.getenv("DB_HOST"),
+    port=os.getenv("DB_PORT"),
+    user=os.getenv("DB_USER"),
+    password=os.getenv("DB_PASSWORD"),
+    database=os.getenv("DB_NAME"),
+    ssl_disabled=False,
+)
+
+cursor = databrew_connection.cursor()
+print("Databrew connection initialized successfully")
 
 
 @app.get("/")
