@@ -75,11 +75,12 @@ databrew_connection = mysql.connector.connect(
     user=os.getenv("DB_USER"),
     password=os.getenv("DB_PASSWORD"),
     database=os.getenv("DB_NAME"),
-    ssl_disabled=False
+    ssl_disabled=False,
 )
 
 cursor = databrew_connection.cursor()
 print("Databrew connection initialized successfully")
+
 
 @app.get("/")
 def read_root():
