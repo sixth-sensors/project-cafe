@@ -211,7 +211,7 @@ async def receive_telemetry(request: Request):
 
     Expected packet format:
     {
-        "sender_id" : Sender.HOMEBREW
+        "sender_id" : Sender.HOMEBREW,
         "type" : "telemetry",
         "temperature" : <TEMPERATURE>,
         "flow_rate" : <FLOW RATE>
@@ -290,14 +290,12 @@ async def get_homebrew_brew():
 async def brew(request: Request):
     """
     Receives a brew request from Overbrew. Returns "brew accepted" or error messages when applicable.
-    If Overbrew requests that a profile is created, this function will populate Databrew with the new profile.
 
     Expected packet format:
     {
         "sender_id" : Sender.OVERBREW,
         "type" : "brew",
         "user_id" : <ID OF THE USER LOGGED IN>
-        "create_profile" : True | False,
 
         "temperature" : <TARGET TEMPERATURE>
         "flow_rate" : <TARGET FLOW RATE>
@@ -323,7 +321,6 @@ async def brew(request: Request):
     sender_id = msg.get("sender_id")
     msg_type = msg.get("type")
     user_id = msg.get("user_id")
-    create_profile = msg.get("create_profile")
     intent = msg.get("intent")
 
     target_temperature = msg.get("temperature")
@@ -337,8 +334,7 @@ async def brew(request: Request):
         )
 
     if (
-        not isinstance(create_profile, bool)
-        or not isinstance(intent, str)
+        not isinstance(intent, str)
         or not isinstance(target_temperature, (float, int))
         or not isinstance(flow_rate, (float, int))
         or not sender_id
@@ -387,10 +383,6 @@ async def brew(request: Request):
         },
     )
 
-    # TODO: enqueue into DB here
-    if create_profile:
-        pass
-
     return {
         "sender_id": Sender.AWAYBREW,
         "type": "brew_started",
@@ -407,6 +399,7 @@ async def favourite_brew(request):
     Expected packet format:
     {
         "sender_id" : Sender.OVERBREW,
+        "type" : "favourite",
         "brew_id" : <BREW ID>,
         "user_id" : <USER ID>,
         "toggle_favourite" : True | False
@@ -423,12 +416,14 @@ async def favourite_brew(request):
         )
 
     sender_id = msg["sender_id"]
+    msg_type = msg["type"]
     brew_id = msg["brew_id"]
     user_id = msg["user_id"]
     toggle_favourite = msg["user_id"]
 
     if (
         sender_id != Sender.OVERBREW
+        or msg_type != "favourite"
         or not isinstance(msg, dict)
         or not brew_id
         or not user_id
