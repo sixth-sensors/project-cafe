@@ -8,9 +8,9 @@ import './Grids.css'
 import { useTelemetryStream } from '../../../hooks/useTelemetryStream'
 
 interface TemperatureData {
-  time: string
   temperature: number
   timestamp: number
+  time: string
   target_temp?: number
 }
 
@@ -27,9 +27,14 @@ const Info = () => {
     setTemperatureData((prev) => [
       ...prev,
       {
-        time: latest.time,
         temperature: latest.temp,
+        time: new Date(latest.timestamp).toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }),
         timestamp: latest.timestamp,
+        target_temp: latest.target_temp,
       },
     ])
   }, [latest])
