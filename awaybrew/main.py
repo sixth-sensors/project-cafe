@@ -17,6 +17,8 @@ from firebase_admin import auth, credentials
 from utils.packet import Packet
 from utils.sender import Sender
 
+MAXIMUM_NUMBER_OF_BREW_REQUESTS = 10
+
 # Load environment variables
 load_dotenv()
 
@@ -78,7 +80,8 @@ databrew_connection = mysql.connector.connect(
     ssl_disabled=False,
 )
 
-cursor = databrew_connection.cursor()
+cursor = databrew_connection.cursor(dictionary=True)
+create_tables()
 print("Databrew connection initialized successfully")
 
 
@@ -86,6 +89,56 @@ print("Databrew connection initialized successfully")
 def read_root():
     return {"Hello": "World"}
 
+#####################
+# DATABREW FUNCTIONS
+#####################
+
+def create_table():
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS brew_requests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id VARCHAR(64) NOT NULL,
+        temperature FLOAT NOT NULL,
+        flow_rate FLOAT NOT NULL,
+        start_timestamp TIMESTAMP NOT NULL,
+        favourite BOOLEAN DEFAULT FALSE
+    )
+    """)
+    return
+
+def create_brew_request(user_id: str, temperature: float, flow_rate: float, start_timestamp: datetime, favourite: bool):
+    cursor.execute("""
+    INSERT INTO brew_requests (user_id, temperature, flow_rate, start_timestamp, favourite) 
+    VALUES (%s, %s, %s, %s, %s)
+    """, (user_id, temperature, flow_rate, start_timestamp, favourite))
+    connection.commit()
+    return
+
+def favourite_brew_request(brew_id: int, favourite_status: bool):
+    cursor.execute("""
+    UPDATE brew_requests SET favourite = %s WHERE id = %s
+    """, (favourite_status, brew_id))
+    connection.commit()
+    return
+
+def get_user_brew_requests(user_id: str, number_of_requests: int):
+    cursor.execute("""
+    SELECT id, temperature, flow_rate, start_timestamp, favourite 
+    FROM brew_requests 
+    WHERE user_id = %s 
+    ORDER BY start_timestamp DESC 
+    LIMIT %s
+    """, (user_id, number_of_requests))
+    return cursor.fetchall()
+
+def get_user_favourites(user_id: str):
+    cursor.execute("""
+    SELECT id, temperature, flow_rate, start_timestamp, favourite 
+    FROM brew_requests 
+    WHERE user_id = %s AND favourite = TRUE
+    ORDER BY start_timestamp DESC
+    """, (user_id,))
+    return cursor.fetchall()
 
 #####################
 # TEST ENDPOINTS
@@ -383,6 +436,8 @@ async def brew(request: Request):
         },
     )
 
+    create_brew_request(user_id=user_id, temperature=float(target_temperature), flow_rate=float(flow_rate), start_timestamp=datetime.now(), favourite=False)
+
     return {
         "sender_id": Sender.AWAYBREW,
         "type": "brew_started",
@@ -393,7 +448,7 @@ async def brew(request: Request):
 @app.put("/favourite_brew")
 async def favourite_brew(request):
     """
-    Label/unlabel a brew as a "favourite" brew. Favourited brews are surfaced
+    Label/unlabel a brew as a "favourite" brew. Favourited brews are surfaced. Return a message if successful
     at the top of the frontend service.
 
     Expected packet format:
@@ -437,7 +492,13 @@ async def favourite_brew(request):
 
     print(f"Received: {msg}")
 
-    pass  # TODO: MANNY
+    favourite_brew_request(brew_id=brew_id, favourite_status=toggle_favourite)
+
+    return {
+        "sender_id": Sender.AWAYBREW,
+        "type": "brew favourite status changed to " + str(toggle_favourite),
+        "request_id": request_id,
+    }
 
 
 #####################
@@ -445,29 +506,33 @@ async def favourite_brew(request):
 #####################
 
 
-@app.get("/fetch-recents")
-async def fetch_recent_brews():
+@app.get("/fetch-recents/{user_id}")
+async def fetch_recent_brews(user_id: str):
     """
-    Fetch a list of favourited brews from the data
+    Fetch a list of the most recent brews from Databrew
     """
+
+    brews = get_user_brew_requests(user_id=user_id, number_of_requests=MAXIMUM_NUMBER_OF_BREW_REQUESTS)
 
     return {
         "sender_id": Sender.AWAYBREW,
         "type": "fetched recent brews",
-        # TODO: MANNY
+        "brews": brews
     }
 
 
-@app.get("/fetch-favourites")
-async def fetch_favourites():
+@app.get("/fetch-favourites/{user_id}")
+async def fetch_favourites(user_id: str):
     """
-    Fetch a list of favourited brews from the data
+    Fetch a list of favourited brews from Databrew
     """
+
+    favourites = get_user_favourites(user_id=user_id)
 
     return {
         "sender_id": Sender.AWAYBREW,
         "type": "fetched favourites",
-        # TODO: MANNY
+        "favourites": favourites
     }
 
 
