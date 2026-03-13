@@ -441,6 +441,37 @@ async def favourite_brew(request):
 
 
 #####################
+# DATABREW ENDPOINTS
+#####################
+
+
+@app.get("/fetch-recents")
+async def fetch_recent_brews():
+    """
+    Fetch a list of favourited brews from the data
+    """
+
+    return {
+        "sender_id": Sender.AWAYBREW,
+        "type": "fetched recent brews",
+        # TODO: MANNY
+    }
+
+
+@app.get("/fetch-favourites")
+async def fetch_favourites():
+    """
+    Fetch a list of favourited brews from the data
+    """
+
+    return {
+        "sender_id": Sender.AWAYBREW,
+        "type": "fetched favourites",
+        # TODO: MANNY
+    }
+
+
+#####################
 # AUTOBREW ENDPOINTS
 #####################
 
