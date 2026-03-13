@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime
 
 import firebase_admin
+import mysql.connector
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,7 +16,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from firebase_admin import auth, credentials
 from utils.packet import Packet
 from utils.sender import Sender
-import mysql.connector
 
 # Load environment variables
 load_dotenv()
@@ -213,7 +213,8 @@ async def receive_telemetry(request: Request):
     {
         "sender_id" : Sender.HOMEBREW
         "type" : "telemetry",
-        <READINGS>
+        "temperature" : <TEMPERATURE>,
+        "flow_rate" : <FLOW RATE>
     }
     """
     try:
@@ -299,6 +300,7 @@ async def brew(request: Request):
         "create_profile" : True | False,
 
         "temperature" : <TARGET TEMPERATURE>
+        "flow_rate" : <TARGET FLOW RATE>
 
         "intent" : <Intent for the MCP server>
     }
@@ -396,6 +398,22 @@ async def brew(request: Request):
     }
 
 
+@app.post("/favourite_brew")
+async def favourite_brew():
+    """
+    Label/unlabel a brew as a "favourite" brew. Favourited brews are surfaced
+    at the top of the frontend service.
+
+    Expected packet format:
+    {
+        "brew_id" : <BREW ID>,
+        "user_id" : <USER ID>,
+        "toggle_favourite" : True | False
+    }
+    """
+    pass  # TODO: MANNY
+
+
 #####################
 # AUTOBREW ENDPOINTS
 #####################
@@ -425,12 +443,6 @@ async def brew_status(request_id: str):
     res = copy.deepcopy(job)
 
     return Packet(Sender.AWAYBREW, "brew status", res).to_response()
-
-
-# TODO: check if this is even neccessary. Could be that the other functions work just fine.
-@app.post("/mcp")
-async def mcp_endpoint_stub(request: Request):
-    return Packet.ack(Sender.AWAYBREW).to_response()
 
 
 ##########
