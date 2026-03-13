@@ -81,7 +81,18 @@ databrew_connection = mysql.connector.connect(
 )
 
 cursor = databrew_connection.cursor(dictionary=True)
-create_tables()
+
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS brew_requests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id VARCHAR(64) NOT NULL,
+        temperature FLOAT NOT NULL,
+        flow_rate FLOAT NOT NULL,
+        start_timestamp TIMESTAMP NOT NULL,
+        favourite BOOLEAN DEFAULT FALSE
+    )
+    """)
+
 print("Databrew connection initialized successfully")
 
 
@@ -93,32 +104,19 @@ def read_root():
 # DATABREW FUNCTIONS
 #####################
 
-def create_table():
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS brew_requests (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id VARCHAR(64) NOT NULL,
-        temperature FLOAT NOT NULL,
-        flow_rate FLOAT NOT NULL,
-        start_timestamp TIMESTAMP NOT NULL,
-        favourite BOOLEAN DEFAULT FALSE
-    )
-    """)
-    return
-
 def create_brew_request(user_id: str, temperature: float, flow_rate: float, start_timestamp: datetime, favourite: bool):
     cursor.execute("""
     INSERT INTO brew_requests (user_id, temperature, flow_rate, start_timestamp, favourite) 
     VALUES (%s, %s, %s, %s, %s)
     """, (user_id, temperature, flow_rate, start_timestamp, favourite))
-    connection.commit()
+    databrew_connection.commit()
     return
 
 def favourite_brew_request(brew_id: int, favourite_status: bool):
     cursor.execute("""
     UPDATE brew_requests SET favourite = %s WHERE id = %s
     """, (favourite_status, brew_id))
-    connection.commit()
+    databrew_connection.commit()
     return
 
 def get_user_brew_requests(user_id: str, number_of_requests: int):
