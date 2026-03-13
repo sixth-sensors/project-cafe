@@ -398,19 +398,50 @@ async def brew(request: Request):
     }
 
 
-@app.post("/favourite_brew")
-async def favourite_brew():
+@app.put("/favourite_brew")
+async def favourite_brew(request):
     """
     Label/unlabel a brew as a "favourite" brew. Favourited brews are surfaced
     at the top of the frontend service.
 
     Expected packet format:
     {
+        "sender_id" : Sender.OVERBREW,
         "brew_id" : <BREW ID>,
         "user_id" : <USER ID>,
         "toggle_favourite" : True | False
     }
     """
+
+    try:
+        msg = await request.json()
+    except Exception:
+        return Response(
+            content='{"error":"invalid_json"}',
+            media_type="application/json",
+            status_code=400,
+        )
+
+    sender_id = msg["sender_id"]
+    brew_id = msg["brew_id"]
+    user_id = msg["user_id"]
+    toggle_favourite = msg["user_id"]
+
+    if (
+        sender_id != Sender.OVERBREW
+        or not isinstance(msg, dict)
+        or not brew_id
+        or not user_id
+        or not toggle_favourite
+    ):
+        return Response(
+            content='{"type":"error","error":"invalid_message"}',
+            media_type="application/json",
+            status_code=400,
+        )
+
+    print(f"Received: {msg}")
+
     pass  # TODO: MANNY
 
 
