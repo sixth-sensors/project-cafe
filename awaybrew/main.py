@@ -17,6 +17,8 @@ from firebase_admin import auth, credentials
 from utils.packet import Packet
 from utils.sender import Sender
 
+MAXIMUM_NUMBER_OF_BREW_REQUESTS = 10
+
 # Load environment variables
 load_dotenv()
 
@@ -78,7 +80,19 @@ databrew_connection = mysql.connector.connect(
     ssl_disabled=False,
 )
 
-cursor = databrew_connection.cursor()
+cursor = databrew_connection.cursor(dictionary=True)
+
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS brew_requests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id VARCHAR(64) NOT NULL,
+        temperature FLOAT NOT NULL,
+        flow_rate FLOAT NOT NULL,
+        start_timestamp TIMESTAMP NOT NULL,
+        favourite BOOLEAN DEFAULT FALSE
+    )
+    """)
+
 print("Databrew connection initialized successfully")
 
 
@@ -86,6 +100,43 @@ print("Databrew connection initialized successfully")
 def read_root():
     return {"Hello": "World"}
 
+#####################
+# DATABREW FUNCTIONS
+#####################
+
+def create_brew_request(user_id: str, temperature: float, flow_rate: float, start_timestamp: datetime, favourite: bool):
+    cursor.execute("""
+    INSERT INTO brew_requests (user_id, temperature, flow_rate, start_timestamp, favourite) 
+    VALUES (%s, %s, %s, %s, %s)
+    """, (user_id, temperature, flow_rate, start_timestamp, favourite))
+    databrew_connection.commit()
+    return
+
+def favourite_brew_request(brew_id: int, favourite_status: bool):
+    cursor.execute("""
+    UPDATE brew_requests SET favourite = %s WHERE id = %s
+    """, (favourite_status, brew_id))
+    databrew_connection.commit()
+    return
+
+def get_user_brew_requests(user_id: str, number_of_requests: int):
+    cursor.execute("""
+    SELECT id, temperature, flow_rate, start_timestamp, favourite 
+    FROM brew_requests 
+    WHERE user_id = %s 
+    ORDER BY start_timestamp DESC 
+    LIMIT %s
+    """, (user_id, number_of_requests))
+    return cursor.fetchall()
+
+def get_user_favourites(user_id: str):
+    cursor.execute("""
+    SELECT id, temperature, flow_rate, start_timestamp, favourite 
+    FROM brew_requests 
+    WHERE user_id = %s AND favourite = TRUE
+    ORDER BY start_timestamp DESC
+    """, (user_id,))
+    return cursor.fetchall()
 
 #####################
 # TEST ENDPOINTS
@@ -211,7 +262,7 @@ async def receive_telemetry(request: Request):
 
     Expected packet format:
     {
-        "sender_id" : Sender.HOMEBREW
+        "sender_id" : Sender.HOMEBREW,
         "type" : "telemetry",
         "temperature" : <TEMPERATURE>,
         "flow_rate" : <FLOW RATE>
@@ -290,14 +341,12 @@ async def get_homebrew_brew():
 async def brew(request: Request):
     """
     Receives a brew request from Overbrew. Returns "brew accepted" or error messages when applicable.
-    If Overbrew requests that a profile is created, this function will populate Databrew with the new profile.
 
     Expected packet format:
     {
         "sender_id" : Sender.OVERBREW,
         "type" : "brew",
         "user_id" : <ID OF THE USER LOGGED IN>
-        "create_profile" : True | False,
 
         "temperature" : <TARGET TEMPERATURE>
         "flow_rate" : <TARGET FLOW RATE>
@@ -323,7 +372,6 @@ async def brew(request: Request):
     sender_id = msg.get("sender_id")
     msg_type = msg.get("type")
     user_id = msg.get("user_id")
-    create_profile = msg.get("create_profile")
     intent = msg.get("intent")
 
     target_temperature = msg.get("temperature")
@@ -337,8 +385,7 @@ async def brew(request: Request):
         )
 
     if (
-        not isinstance(create_profile, bool)
-        or not isinstance(intent, str)
+        not isinstance(intent, str)
         or not isinstance(target_temperature, (float, int))
         or not isinstance(flow_rate, (float, int))
         or not sender_id
@@ -387,9 +434,7 @@ async def brew(request: Request):
         },
     )
 
-    # TODO: enqueue into DB here
-    if create_profile:
-        pass
+    create_brew_request(user_id=user_id, temperature=float(target_temperature), flow_rate=float(flow_rate), start_timestamp=datetime.now(), favourite=False)
 
     return {
         "sender_id": Sender.AWAYBREW,
@@ -401,12 +446,13 @@ async def brew(request: Request):
 @app.put("/favourite_brew")
 async def favourite_brew(request):
     """
-    Label/unlabel a brew as a "favourite" brew. Favourited brews are surfaced
+    Label/unlabel a brew as a "favourite" brew. Favourited brews are surfaced. Return a message if successful
     at the top of the frontend service.
 
     Expected packet format:
     {
         "sender_id" : Sender.OVERBREW,
+        "type" : "favourite",
         "brew_id" : <BREW ID>,
         "user_id" : <USER ID>,
         "toggle_favourite" : True | False
@@ -423,12 +469,14 @@ async def favourite_brew(request):
         )
 
     sender_id = msg["sender_id"]
+    msg_type = msg["type"]
     brew_id = msg["brew_id"]
     user_id = msg["user_id"]
     toggle_favourite = msg["user_id"]
 
     if (
         sender_id != Sender.OVERBREW
+        or msg_type != "favourite"
         or not isinstance(msg, dict)
         or not brew_id
         or not user_id
@@ -442,7 +490,48 @@ async def favourite_brew(request):
 
     print(f"Received: {msg}")
 
-    pass  # TODO: MANNY
+    favourite_brew_request(brew_id=brew_id, favourite_status=toggle_favourite)
+
+    return {
+        "sender_id": Sender.AWAYBREW,
+        "type": "brew favourite status changed to " + str(toggle_favourite),
+        "request_id": request_id,
+    }
+
+
+#####################
+# DATABREW ENDPOINTS
+#####################
+
+
+@app.get("/fetch-recents/{user_id}")
+async def fetch_recent_brews(user_id: str):
+    """
+    Fetch a list of the most recent brews from Databrew
+    """
+
+    brews = get_user_brew_requests(user_id=user_id, number_of_requests=MAXIMUM_NUMBER_OF_BREW_REQUESTS)
+
+    return {
+        "sender_id": Sender.AWAYBREW,
+        "type": "fetched recent brews",
+        "brews": brews
+    }
+
+
+@app.get("/fetch-favourites/{user_id}")
+async def fetch_favourites(user_id: str):
+    """
+    Fetch a list of favourited brews from Databrew
+    """
+
+    favourites = get_user_favourites(user_id=user_id)
+
+    return {
+        "sender_id": Sender.AWAYBREW,
+        "type": "fetched favourites",
+        "favourites": favourites
+    }
 
 @app.post("/abort")
 async def abort_brew(request: Request):
