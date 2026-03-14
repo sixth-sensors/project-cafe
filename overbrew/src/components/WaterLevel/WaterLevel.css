@@ -33,7 +33,7 @@
   left: 0;
   width: 200%;
   height: 30px;
-  animation: wave-scroll 2.5s linear infinite;
+  animation: wave-scroll 5s linear infinite;
 }
 
 .wave {
