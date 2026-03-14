@@ -220,6 +220,43 @@
   }
 }
 
+.progress-card {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.abort-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+
+  & span {
+    font-weight: 600;
+    color: var(--abort);
+  }
+}
+
+.abort-button {
+  background-color: var(--abort);
+  border: none;
+  border-radius: 50%;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  color: white;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+
+  &:hover {
+    background-color: hsl(from var(--abort) h s l / 0.8);
+  }
+}
+
 ::-webkit-scrollbar {
   display: none;
 }

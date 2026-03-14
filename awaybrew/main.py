@@ -179,7 +179,7 @@ async def get_telemetry_data(request: Request, token: str = Query(...)):
     app.state.SSE_QUEUES.add(queue)
 
     async def sse_generator():
-        yield f"data: {json.dumps({'type': 'connected'})}\n\n"
+        yield f"data: {json.dumps({'type': 'connected', 'brew_status': bool(app.state.ACTIVE_BREW)})}\n\n"
         try:
             while True:
                 if await request.is_disconnected():
@@ -444,6 +444,44 @@ async def favourite_brew(request):
 
     pass  # TODO: MANNY
 
+@app.post("/abort")
+async def abort_brew(request: Request):
+    """
+    Sets the active brew to None, which signals Homebrew to stop the brew and resets the state for the next brew.
+    """
+    try:
+        msg = await request.json()
+    except Exception:
+        return Response(
+            content='{"error":"invalid_json"}',
+            media_type="application/json",
+            status_code=400,
+        )
+
+    sender_id = msg.get("sender_id")
+    user_id = msg.get("user_id")
+
+    if sender_id != Sender.OVERBREW or not user_id:
+        return Response(
+            content='{"type":"error","error":"invalid_message"}',
+            media_type="application/json",
+            status_code=400,
+        )
+
+    print(f"Received abort request from user {user_id}")
+
+    app.state.ACTIVE_BREW = None
+
+    await broadcast(
+        {
+            "type": "brew_aborted",
+            "request_id": app.state.ACTIVE_BREW["request_id"]
+            if app.state.ACTIVE_BREW
+            else None,
+        },
+    )
+
+    return {"status": "aborted"}
 
 #####################
 # AUTOBREW ENDPOINTS

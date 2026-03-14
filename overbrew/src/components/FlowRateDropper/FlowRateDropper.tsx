@@ -33,7 +33,6 @@ const FlowRateDropper = ({ flowRate }: FlowRateDropperProps) => {
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const styleRef = useRef<HTMLStyleElement | null>(null)
-  const animRef = useRef<Animation | null>(null)
   const pendingRef = useRef({ totalDuration, growDuration })
 
   useEffect(() => {
@@ -46,9 +45,7 @@ const FlowRateDropper = ({ flowRate }: FlowRateDropperProps) => {
       document.head.appendChild(styleRef.current)
     }
     styleRef.current.textContent = buildKeyframes(totalDuration, growDuration)
-    if (animRef.current) {
-      animRef.current.updatePlaybackRate(BASE_DURATION / totalDuration)
-    }
+
     return () => {
       styleRef.current?.remove()
       styleRef.current = null
@@ -56,34 +53,44 @@ const FlowRateDropper = ({ flowRate }: FlowRateDropperProps) => {
   }, [growDuration, totalDuration])
 
   useEffect(() => {
+    if (flowRate > 0) {
+      const icon =
+        containerRef.current?.querySelector<HTMLElement>('.dropper-icon')
+      const anim = icon?.getAnimations()[0]
+      if (anim) {
+        anim.updatePlaybackRate(BASE_DURATION / totalDuration)
+      }
+    }
+  }, [flowRate, totalDuration])
+
+  useEffect(() => {
     const icon =
       containerRef.current?.querySelector<HTMLElement>('.dropper-icon')
     if (!icon) return
-
-    const anim = icon.getAnimations()[0]
-    if (!anim) return
-
-    animRef.current = anim
-    anim.updatePlaybackRate(BASE_DURATION / pendingRef.current.totalDuration)
 
     const handleIteration = () => {
       const { totalDuration: td, growDuration: gd } = pendingRef.current
       if (styleRef.current) {
         styleRef.current.textContent = buildKeyframes(td, gd)
       }
-      anim.updatePlaybackRate(BASE_DURATION / td)
+      const currentAnim = icon.getAnimations()[0]
+      if (currentAnim) {
+        currentAnim.updatePlaybackRate(BASE_DURATION / td)
+      }
     }
 
     icon.addEventListener('animationiteration', handleIteration)
     return () => {
       icon.removeEventListener('animationiteration', handleIteration)
-      animRef.current = null
     }
   }, [])
 
   return (
     <div className="flow-rate-dropper" ref={containerRef}>
-      <FaDroplet className="dropper-icon" />
+      <FaDroplet
+        className="dropper-icon"
+        style={flowRate === 0 ? { animation: 'none', opacity: 0 } : undefined}
+      />
       <div className="dropper-top">Flow Rate</div>
       <div className="dropper-nozzle" />
       <div className="pot-container">
