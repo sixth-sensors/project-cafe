@@ -51,7 +51,9 @@ async def _post(path: str, payload: dict[str, Any]) -> dict[str, Any] | None:
             response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as e:
-            print(f"HTTP error on POST {path}: {e.response.status_code} – {e.response.text}")
+            print(
+                f"HTTP error on POST {path}: {e.response.status_code} – {e.response.text}"
+            )
             return None
         except Exception as e:
             print(f"Request error on POST {path}: {e}")

@@ -96,7 +96,9 @@ cursor.execute("""
 
 # Attempt to gracefully alter the table if it already exists from a previous step
 try:
-    cursor.execute("ALTER TABLE brew_requests ADD COLUMN title VARCHAR(255) DEFAULT 'My Brew'")
+    cursor.execute(
+        "ALTER TABLE brew_requests ADD COLUMN title VARCHAR(255) DEFAULT 'My Brew'"
+    )
 except mysql.connector.Error as err:
     # Error 1060 is "Duplicate column name", meaning it already exists
     if err.errno != 1060:
@@ -109,43 +111,68 @@ print("Databrew connection initialized successfully")
 def read_root():
     return {"Hello": "World"}
 
+
 #####################
 # DATABREW FUNCTIONS
 #####################
 
-def create_brew_request(user_id: str, title: str, temperature: float, flow_rate: float, start_timestamp: datetime, favourite: bool):
-    cursor.execute("""
+
+def create_brew_request(
+    user_id: str,
+    title: str,
+    temperature: float,
+    flow_rate: float,
+    start_timestamp: datetime,
+    favourite: bool,
+):
+    cursor.execute(
+        """
     INSERT INTO brew_requests (user_id, title, temperature, flow_rate, start_timestamp, favourite) 
     VALUES (%s, %s, %s, %s, %s, %s)
-    """, (user_id, title, temperature, flow_rate, start_timestamp, favourite))
+    """,
+        (user_id, title, temperature, flow_rate, start_timestamp, favourite),
+    )
     databrew_connection.commit()
     return cursor.lastrowid
 
+
 def favourite_brew_request(brew_id: int, favourite_status: bool):
-    cursor.execute("""
+    cursor.execute(
+        """
     UPDATE brew_requests SET favourite = %s WHERE id = %s
-    """, (favourite_status, brew_id))
+    """,
+        (favourite_status, brew_id),
+    )
     databrew_connection.commit()
     return
 
+
 def get_user_brew_requests(user_id: str, number_of_requests: int):
-    cursor.execute("""
+    cursor.execute(
+        """
     SELECT id, user_id, title, temperature, flow_rate, start_timestamp, favourite 
     FROM brew_requests 
     WHERE user_id = %s 
     ORDER BY start_timestamp DESC 
     LIMIT %s
-    """, (user_id, number_of_requests))
+    """,
+        (user_id, number_of_requests),
+    )
     return cursor.fetchall()
 
+
 def get_user_favourites(user_id: str):
-    cursor.execute("""
+    cursor.execute(
+        """
     SELECT id, user_id, title, temperature, flow_rate, start_timestamp, favourite 
     FROM brew_requests 
     WHERE user_id = %s AND favourite = TRUE
     ORDER BY start_timestamp DESC
-    """, (user_id,))
+    """,
+        (user_id,),
+    )
     return cursor.fetchall()
+
 
 #####################
 # TEST ENDPOINTS
@@ -343,12 +370,16 @@ async def get_homebrew_brew(request: Request):
             payload=payload,
         )
         if "application/json" in accept_header:
-            return Response(content=json.dumps(packet.to_dict()), media_type="application/json")
+            return Response(
+                content=json.dumps(packet.to_dict()), media_type="application/json"
+            )
         return packet.to_response()
 
     packet = Packet.ack(Sender.AWAYBREW)
     if "application/json" in accept_header:
-        return Response(content=json.dumps(packet.to_dict()), media_type="application/json")
+        return Response(
+            content=json.dumps(packet.to_dict()), media_type="application/json"
+        )
     return packet.to_response()
 
 
@@ -451,7 +482,14 @@ async def brew(request: Request):
         },
     )
 
-    db_id = create_brew_request(user_id=user_id, title=title, temperature=float(target_temperature), flow_rate=float(flow_rate), start_timestamp=datetime.now(), favourite=False)
+    db_id = create_brew_request(
+        user_id=user_id,
+        title=title,
+        temperature=float(target_temperature),
+        flow_rate=float(flow_rate),
+        start_timestamp=datetime.now(),
+        favourite=False,
+    )
 
     return {
         "sender_id": Sender.AWAYBREW,
@@ -528,12 +566,14 @@ async def fetch_recent_brews(user_id: str):
     Fetch a list of the most recent brews from Databrew
     """
 
-    brews = get_user_brew_requests(user_id=user_id, number_of_requests=MAXIMUM_NUMBER_OF_BREW_REQUESTS)
+    brews = get_user_brew_requests(
+        user_id=user_id, number_of_requests=MAXIMUM_NUMBER_OF_BREW_REQUESTS
+    )
 
     return {
         "sender_id": Sender.AWAYBREW,
         "type": "fetched recent brews",
-        "brews": brews
+        "brews": brews,
     }
 
 
@@ -548,8 +588,9 @@ async def fetch_favourites(user_id: str):
     return {
         "sender_id": Sender.AWAYBREW,
         "type": "fetched favourites",
-        "favourites": favourites
+        "favourites": favourites,
     }
+
 
 @app.post("/abort")
 async def abort_brew(request: Request):
@@ -589,6 +630,7 @@ async def abort_brew(request: Request):
     )
 
     return {"status": "aborted"}
+
 
 #####################
 # AUTOBREW ENDPOINTS
