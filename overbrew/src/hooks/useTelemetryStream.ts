@@ -3,7 +3,7 @@ import { useAuth } from './useAuth'
 import { BASE_URL } from '../lib/api'
 import type { TelemetryType } from '../constants/telemetry'
 
-interface TelemetryEvent {
+export interface TelemetryEvent {
   type: TelemetryType
   request_id: string
   time: string

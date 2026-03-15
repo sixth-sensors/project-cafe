@@ -5,8 +5,8 @@ import ProgressBar from '../../../components/ProgressBar/ProgressBar'
 import FlowRateDropper from '../../../components/FlowRateDropper/FlowRateDropper'
 import WaterLevel from '../../../components/WaterLevel/WaterLevel'
 import './Grids.css'
-import { useTelemetryStream } from '../../../hooks/useTelemetryStream'
 import { useAuth } from '../../../hooks/useAuth'
+import { useBrew } from '../../../hooks/useBrew'
 import { apiFetch, SENDER_ID } from '../../../lib/api'
 
 import { FaTimes } from 'react-icons/fa'
@@ -20,8 +20,7 @@ interface TemperatureData {
 
 const Info = () => {
   const { user } = useAuth()
-  const { latest } = useTelemetryStream()
-  const [brewActive, setBrewActive] = useState(false)
+  const { latest, brewActive, brewStartTime } = useBrew()
   const [temperatureData, setTemperatureData] = useState<TemperatureData[]>([])
   const [progress, setProgress] = useState(0.0)
   const [flowRate, setFlowRate] = useState(0.0)
@@ -42,21 +41,13 @@ const Info = () => {
 
   useEffect(() => {
     switch (latest?.type) {
-      case 'connected':
-        latest.brew_status && setBrewActive(latest.brew_status)
-        break
-      case 'brew_started':
-        setBrewActive(true)
-        break
       case 'brew_finished':
       case 'brew_aborted':
-        setBrewActive(false)
         setProgress(0)
         setFlowRate(0.0)
         setTemperatureData([])
         break
       case 'telemetry':
-         
         setTemperatureData((prev) => [
           ...prev,
           {
@@ -85,28 +76,39 @@ const Info = () => {
   }, [brewActive])
 
   return (
-    <div className="grid info-content">
-      <div className="card progress-card">
-        <ProgressBar progress={progress} />
-        <div className="abort-container">
-          <button className="abort-button" onClick={handleAbort} type="button">
-            <FaTimes size={32} />
-          </button>
-          <span>Abort</span>
-        </div>
+    <div className="info-wrapper">
+      <div className="brew-status-text">
+        {brewActive
+          ? `Brew active - Started at ${brewStartTime ? brewStartTime.toLocaleTimeString() : '...'}`
+          : 'No brew currently active'}
       </div>
-      <div className="grid info-bottom">
-        <div className="card water-level">
-          <WaterLevel percentage={progress * 100} />
+      <div className="grid info-content">
+        <div className="card progress-card">
+          <ProgressBar progress={progress} />
+          <div className="abort-container">
+            <button
+              className="abort-button"
+              onClick={handleAbort}
+              type="button"
+            >
+              <FaTimes size={32} />
+            </button>
+            <span>Abort</span>
+          </div>
         </div>
-        <div className="card dropper">
-          <FlowRateDropper flowRate={flowRate} />
-        </div>
-        <div className="card">
-          <LineChart
-            data={temperatureData}
-            target={temperatureData[0]?.target_temp ?? TARGET_TEMPERATURE}
-          />
+        <div className="grid info-bottom">
+          <div className="card water-level">
+            <WaterLevel percentage={progress * 100} />
+          </div>
+          <div className="card dropper">
+            <FlowRateDropper flowRate={flowRate} />
+          </div>
+          <div className="card">
+            <LineChart
+              data={temperatureData}
+              target={temperatureData[0]?.target_temp ?? TARGET_TEMPERATURE}
+            />
+          </div>
         </div>
       </div>
     </div>

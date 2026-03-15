@@ -1,5 +1,6 @@
 import './BrewButton.css'
 import type { BrewSettings } from '../../pages/Home/Grids/Brew'
+import { FaStar } from 'react-icons/fa'
 
 type BrewButtonProps = {
   title: string
@@ -41,12 +42,12 @@ const BrewButton = ({
           </div>
         </button>
       </div>
-      <input
-        checked={isFavorite}
-        className="fav-button"
-        onChange={onToggleFavorite}
-        type="checkbox"
-      />
+      <button className="fav-button" onClick={onToggleFavorite} type="button">
+        <FaStar
+          color={isFavorite ? 'var(--yellow)' : 'var(--dark-grey)'}
+          size={32}
+        />
+      </button>
     </div>
   )
 }

@@ -45,6 +45,9 @@
 }
 
 .fav-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   height: 70px;
   aspect-ratio: 1/1;
   border: none;
@@ -52,6 +55,7 @@
   background-color: var(--silver);
   margin: 1rem;
   appearance: none;
+  cursor: pointer;
   box-shadow:
     0 1px 2px #fff,
     0 -1px 1px hsl(from var(--silver) h s l / 0.8),
@@ -62,17 +66,18 @@
     background-color: hsl(from var(--silver) h s l / 0.8);
   }
 
-  &:checked:hover {
-    background-color: hsl(from var(--silver) h s l / 0.4);
-  }
-
-  &:checked {
+  &:active {
     background-color: hsl(from var(--silver) h s l / 0.6);
     box-shadow:
       0 1px 2px #fff,
       0 -1px 1px hsl(from var(--silver) h s l / 0.2),
       inset 0 -1px 1px rgba(0, 0, 0, 0.5),
       inset 0 1px 1px rgba(255, 255, 255, 0.8);
+  }
+
+  & svg {
+    filter: drop-shadow(0px -1px 1px rgba(0, 0, 0, 0.6))
+      drop-shadow(0px 1px 1px rgba(255, 255, 255, 0.8));
   }
 }
 

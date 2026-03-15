@@ -323,20 +323,33 @@ async def receive_telemetry(request: Request):
 
 # Running a web server on homebrew is unviable so it just polls every second or so for the current brew
 @app.get("/homebrew/brew")
-async def get_homebrew_brew():
+async def get_homebrew_brew(request: Request):
     """
     Polled by Homebrew to check for pending brew commands.
     Returns the active brew target or an ACK if no brew is active.
     """
+    accept_header = request.headers.get("accept", "")
 
     if app.state.ACTIVE_BREW is not None:
-        return Packet(
+        payload = {
+            "target_temperature": app.state.ACTIVE_BREW["target_temperature"],
+        }
+        if "started_at" in app.state.ACTIVE_BREW:
+            payload["started_at"] = app.state.ACTIVE_BREW["started_at"].isoformat()
+
+        packet = Packet(
             sender_id=Sender.AWAYBREW,
             type="brew",
-            payload={"target_temperature": app.state.ACTIVE_BREW["target_temperature"]},
-        ).to_response()
+            payload=payload,
+        )
+        if "application/json" in accept_header:
+            return Response(content=json.dumps(packet.to_dict()), media_type="application/json")
+        return packet.to_response()
 
-    return Packet.ack(Sender.AWAYBREW).to_response()
+    packet = Packet.ack(Sender.AWAYBREW)
+    if "application/json" in accept_header:
+        return Response(content=json.dumps(packet.to_dict()), media_type="application/json")
+    return packet.to_response()
 
 
 ##################################################

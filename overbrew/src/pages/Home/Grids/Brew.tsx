@@ -2,6 +2,7 @@ import './Grids.css'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../../hooks/useAuth'
 import { apiFetch, SENDER_ID } from '../../../lib/api'
+import { useBrew } from '../../../hooks/useBrew'
 import BrewButton, {
   SkeletonBrewButton,
 } from '../../../components/BrewButton/BrewButton'
@@ -23,6 +24,7 @@ type Brew = {
 
 const Brew = () => {
   const { user } = useAuth()
+  const { brewActive } = useBrew()
   const [temperature, setTemperature] = useState(60)
   const [flowRate, setFlowRate] = useState(0.1)
   const [brewName, setBrewName] = useState('')
@@ -281,9 +283,9 @@ const Brew = () => {
               <div className="brew-detail">
                 <h2>Brew Name:</h2>
                 <input
+                  onChange={(e) => setBrewName(e.target.value)}
                   placeholder="My Brew"
                   value={brewName}
-                  onChange={(e) => setBrewName(e.target.value)}
                 />
               </div>
               <div className="brew-details">
@@ -300,7 +302,11 @@ const Brew = () => {
           </div>
           <div className="brew-start-panel">
             <h2>Start Brew</h2>
-            <button onClick={handleStartBrew} type="button">
+            <button
+              onClick={handleStartBrew}
+              type="button"
+              disabled={brewActive}
+            >
               <FaPlay size={24} />
             </button>
           </div>

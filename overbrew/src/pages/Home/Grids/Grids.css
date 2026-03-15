@@ -190,6 +190,7 @@
 
   & button {
     display: inline-flex;
+    color: var(--dark-grey);
     align-items: center;
     justify-content: center;
     height: 70px;
@@ -214,6 +215,26 @@
       box-shadow:
         0 1px 2px #fff,
         0 -1px 1px hsl(from var(--silver) h s l / 0.2),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.5),
+        inset 0 1px 1px rgba(255, 255, 255, 0.8);
+    }
+
+    & svg {
+      filter: drop-shadow(0px -1px 1px rgba(0, 0, 0, 0.6))
+        drop-shadow(0px 1px 1px rgba(255, 255, 255, 0.8));
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    &:disabled:hover,
+    &:disabled:active {
+      background-color: var(--silver);
+      box-shadow:
+        0 1px 2px #fff,
+        0 -1px 1px hsl(from var(--silver) h s l / 0.8),
         inset 0 -1px 1px rgba(0, 0, 0, 0.5),
         inset 0 1px 1px rgba(255, 255, 255, 0.8);
     }
@@ -261,8 +282,27 @@
   display: none;
 }
 
+.info-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+}
+
+.brew-status-text {
+  margin-bottom: 1rem;
+  text-align: center;
+  font-size: 1.2rem;
+  font-weight: bold;
+  width: 100%;
+  flex-shrink: 0;
+}
+
 .info-content {
   grid-template-rows: minmax(100px, 2fr) minmax(400px, 7fr);
+  flex: 1;
+  min-height: 0;
 
   & .card {
     background-color: #ffffff;
