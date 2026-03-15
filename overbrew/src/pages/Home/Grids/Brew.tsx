@@ -1,12 +1,13 @@
 import './Grids.css'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../../../hooks/useAuth'
 import { apiFetch, SENDER_ID } from '../../../lib/api'
-import BrewButton from '../../../components/BrewButton/BrewButton'
+import { useBrew } from '../../../hooks/useBrew'
+import BrewButton, {
+  SkeletonBrewButton,
+} from '../../../components/BrewButton/BrewButton'
 import Slider from '../../../components/Slider/Slider'
 import { FaPlay } from 'react-icons/fa'
-
-// TODO: remove
 
 export type BrewSettings = {
   temperature: number
@@ -21,109 +22,176 @@ type Brew = {
   timestamp: string
 }
 
-const mockBrewData = [
-  {
-    id: 'mock-brew-1',
-    title: 'Mock Brew',
-    settings: {
-      temperature: 96,
-      flowRate: 2.5,
-    },
-    isFavorite: true,
-    timestamp: '2026-02-26T18:01:45Z',
-  },
-  {
-    id: 'mock-brew-2',
-    title: 'Mock Brew',
-    settings: {
-      temperature: 95,
-      flowRate: 2.4,
-    },
-    isFavorite: true,
-    timestamp: '2026-02-26T18:01:44Z',
-  },
-  {
-    id: 'mock-brew-3',
-    title: 'Mock Brew',
-    settings: {
-      temperature: 94,
-      flowRate: 2.3,
-    },
-    isFavorite: false,
-    timestamp: '2026-02-26T18:01:43Z',
-  },
-  {
-    id: 'mock-brew-4',
-    title: 'Mock Brew',
-    settings: {
-      temperature: 93,
-      flowRate: 2.2,
-    },
-    isFavorite: false,
-    timestamp: '2026-02-26T18:01:42Z',
-  },
-  {
-    id: 'mock-brew-5',
-    title: 'Mock Brew',
-    settings: {
-      temperature: 92,
-      flowRate: 2.1,
-    },
-    isFavorite: false,
-    timestamp: '2026-02-26T18:01:41Z',
-  },
-  {
-    id: 'mock-brew-6',
-    title: 'Mock Brew',
-    settings: {
-      temperature: 91,
-      flowRate: 2.0,
-    },
-    isFavorite: false,
-    timestamp: '2026-02-26T18:01:40Z',
-  },
-] satisfies Brew[]
-
 const Brew = () => {
   const { user } = useAuth()
+  const { brewActive } = useBrew()
   const [temperature, setTemperature] = useState(60)
   const [flowRate, setFlowRate] = useState(0.1)
-  const [brews, setBrews] = useState<Brew[]>(mockBrewData)
+  const [brewName, setBrewName] = useState('')
+  const [brews, setBrews] = useState<Brew[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    if (!user) return
+
+    let isMounted = true
+
+    const fetchBrews = async () => {
+      try {
+        setIsLoading(true)
+        const [recentsRes, favouritesRes] = await Promise.all([
+          apiFetch(`/fetch-recents/${user.uid}`, user).catch(() => ({
+            brews: [],
+          })),
+          apiFetch(`/fetch-favourites/${user.uid}`, user).catch(() => ({
+            favourites: [],
+          })),
+        ])
+
+        if (isMounted) {
+          const recents = recentsRes.brews || []
+          const favourites = favouritesRes.favourites || []
+
+          interface BrewItemProps {
+            id: string | number
+            title?: string
+            temperature: number
+            flow_rate: number
+            favourite?: boolean | number
+            start_timestamp: string
+          }
+
+          const allBrewsMap = new Map<string, Brew>()
+
+          recents.forEach((item: BrewItemProps) => {
+            allBrewsMap.set(String(item.id), {
+              id: String(item.id),
+              title: item.title || 'Recent Brew',
+              settings: {
+                temperature: item.temperature,
+                flowRate: item.flow_rate,
+              },
+              isFavorite: Boolean(item.favourite),
+              timestamp: item.start_timestamp,
+            })
+          })
+
+          favourites.forEach((item: BrewItemProps) => {
+            allBrewsMap.set(String(item.id), {
+              id: String(item.id),
+              title: item.title || 'Favourite Brew',
+              settings: {
+                temperature: item.temperature,
+                flowRate: item.flow_rate,
+              },
+              isFavorite: true,
+              timestamp: item.start_timestamp,
+            })
+          })
+
+          setBrews(Array.from(allBrewsMap.values()))
+        }
+      } catch (error) {
+        console.error('Failed to fetch brews:', error)
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+
+    fetchBrews()
+
+    return () => {
+      isMounted = false
+    }
+  }, [user])
+
   const sortedBrews = [...brews].sort(
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   )
   const favouriteBrews = sortedBrews.filter((brew) => brew.isFavorite)
   const recentBrews = sortedBrews.filter((brew) => !brew.isFavorite)
 
-  const handleToggleFavorite = (id: string) => {
+  const handleToggleFavorite = async (id: string) => {
+    const brew = brews.find((b) => b.id === id)
+    if (!brew || !user) return
+
+    const newFavoriteStatus = !brew.isFavorite
+
+    // Update optimistically
     setBrews((currentBrews) =>
-      currentBrews.map((brew) =>
-        brew.id === id ? { ...brew, isFavorite: !brew.isFavorite } : brew
+      currentBrews.map((b) =>
+        b.id === id
+          ? {
+              ...b,
+              isFavorite: newFavoriteStatus,
+            }
+          : b
       )
     )
+
+    try {
+      await apiFetch('/favourite_brew', user, {
+        method: 'PUT',
+        body: JSON.stringify({
+          sender_id: SENDER_ID,
+          type: 'favourite',
+          brew_id: parseInt(id, 10),
+          user_id: user.uid,
+          toggle_favourite: newFavoriteStatus,
+        }),
+      })
+    } catch (error) {
+      // Roll back if failed
+      console.error('Failed to update favorite status:', error)
+      setBrews((currentBrews) =>
+        currentBrews.map((b) =>
+          b.id === id
+            ? {
+                ...b,
+                isFavorite: !newFavoriteStatus,
+              }
+            : b
+        )
+      )
+    }
   }
 
-  const handleBrewSelect = (settings: BrewSettings) => {
+  const handleBrewSelect = (settings: BrewSettings, title: string) => {
     setTemperature(settings.temperature)
     setFlowRate(settings.flowRate)
+    setBrewName(title)
   }
 
   const handleStartBrew = async () => {
     if (!user) return
 
     try {
-      await apiFetch('/brew', user, {
+      const response = await apiFetch('/brew', user, {
         method: 'POST',
         body: JSON.stringify({
           sender_id: SENDER_ID,
           type: 'brew',
           user_id: user.uid,
-          create_profile: false,
+          title: brewName || 'My Brew',
           temperature,
           flow_rate: flowRate,
-          intent: `Brew at ${temperature}°C, ${flowRate}g/s`,
         }),
       })
+
+      if (response && response.id) {
+        const newBrew: Brew = {
+          id: String(response.id),
+          title: brewName || 'My Brew',
+          settings: {
+            temperature,
+            flowRate,
+          },
+          isFavorite: false,
+          timestamp: new Date().toISOString(),
+        }
+        setBrews((currentBrews) => [newBrew, ...currentBrews])
+      }
+
       window.location.hash = '#info'
     } catch (error) {
       console.error('Error starting brew:', error)
@@ -137,42 +205,52 @@ const Brew = () => {
         <div className="brew-list">
           <h2>Your Brews</h2>
 
-          {favouriteBrews.length > 0 ? (
+          {isLoading ? (
             <>
-              <h3 className="brew-list-section-title">Favourites</h3>
-              {favouriteBrews.map(
-                ({ id, title, settings, isFavorite, timestamp }) => (
-                  <BrewButton
-                    isFavorite={isFavorite}
-                    key={id}
-                    onClick={handleBrewSelect}
-                    onToggleFavorite={() => handleToggleFavorite(id)}
-                    settings={settings}
-                    timestamp={timestamp}
-                    title={title}
-                  />
+              {[...Array(5)].map((_, index) => (
+                <SkeletonBrewButton key={index} />
+              ))}
+            </>
+          ) : (
+            <>
+              {favouriteBrews.length > 0 ? (
+                <>
+                  <h3 className="brew-list-section-title">Favourites</h3>
+                  {favouriteBrews.map(
+                    ({ id, title, settings, isFavorite, timestamp }) => (
+                      <BrewButton
+                        isFavorite={isFavorite}
+                        key={id}
+                        onClick={handleBrewSelect}
+                        onToggleFavorite={() => handleToggleFavorite(id)}
+                        settings={settings}
+                        timestamp={timestamp}
+                        title={title}
+                      />
+                    )
+                  )}
+                </>
+              ) : null}
+
+              <h3 className="brew-list-section-title">Recent</h3>
+              {recentBrews.length === 0 ? (
+                <p className="brew-list-empty">No recent brews.</p>
+              ) : (
+                recentBrews.map(
+                  ({ id, title, settings, isFavorite, timestamp }) => (
+                    <BrewButton
+                      isFavorite={isFavorite}
+                      key={id}
+                      onClick={handleBrewSelect}
+                      onToggleFavorite={() => handleToggleFavorite(id)}
+                      settings={settings}
+                      timestamp={timestamp}
+                      title={title}
+                    />
+                  )
                 )
               )}
             </>
-          ) : null}
-
-          <h3 className="brew-list-section-title">Recent</h3>
-          {recentBrews.length === 0 ? (
-            <p className="brew-list-empty">No recent brews.</p>
-          ) : (
-            recentBrews.map(
-              ({ id, title, settings, isFavorite, timestamp }) => (
-                <BrewButton
-                  isFavorite={isFavorite}
-                  key={id}
-                  onClick={handleBrewSelect}
-                  onToggleFavorite={() => handleToggleFavorite(id)}
-                  settings={settings}
-                  timestamp={timestamp}
-                  title={title}
-                />
-              )
-            )
           )}
         </div>
       </div>
@@ -213,7 +291,11 @@ const Brew = () => {
             <div className="brew-preview-settings">
               <div className="brew-detail">
                 <h2>Brew Name:</h2>
-                <input placeholder="My Brew" />
+                <input
+                  onChange={(e) => setBrewName(e.target.value)}
+                  placeholder="My Brew"
+                  value={brewName}
+                />
               </div>
               <div className="brew-details">
                 <div className="brew-detail">
@@ -229,7 +311,11 @@ const Brew = () => {
           </div>
           <div className="brew-start-panel">
             <h2>Start Brew</h2>
-            <button onClick={handleStartBrew} type="button">
+            <button
+              disabled={brewActive}
+              onClick={handleStartBrew}
+              type="button"
+            >
               <FaPlay size={24} />
             </button>
           </div>

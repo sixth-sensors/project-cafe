@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from './useAuth'
 import { BASE_URL } from '../lib/api'
+import type { TelemetryType } from '../constants/telemetry'
 
-interface TelemetryEvent {
-  type: 'telemetry'
+export interface TelemetryEvent {
+  type: TelemetryType
   request_id: string
   time: string
   temp: number
   target_temp: number
   timestamp: number
+  brew_status?: boolean
 }
 
 export const useTelemetryStream = () => {
@@ -37,6 +39,7 @@ export const useTelemetryStream = () => {
       eventSource.onmessage = (e) => {
         const event = JSON.parse(e.data)
         setLatest(event)
+        console.log('Received telemetry:', event)
       }
 
       eventSource.onerror = () => {

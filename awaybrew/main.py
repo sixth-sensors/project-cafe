@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime
 
 import firebase_admin
+import mysql.connector
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,7 +16,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from firebase_admin import auth, credentials
 from utils.packet import Packet
 from utils.sender import Sender
-import mysql.connector
+
+MAXIMUM_NUMBER_OF_BREW_REQUESTS = 10
 
 # Load environment variables
 load_dotenv()
@@ -78,13 +80,98 @@ databrew_connection = mysql.connector.connect(
     ssl_disabled=False,
 )
 
-cursor = databrew_connection.cursor()
+cursor = databrew_connection.cursor(dictionary=True)
+
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS brew_requests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id VARCHAR(64) NOT NULL,
+        title VARCHAR(255) DEFAULT 'My Brew',
+        temperature FLOAT NOT NULL,
+        flow_rate FLOAT NOT NULL,
+        start_timestamp TIMESTAMP NOT NULL,
+        favourite BOOLEAN DEFAULT FALSE
+    )
+    """)
+
+# Attempt to gracefully alter the table if it already exists from a previous step
+try:
+    cursor.execute(
+        "ALTER TABLE brew_requests ADD COLUMN title VARCHAR(255) DEFAULT 'My Brew'"
+    )
+except mysql.connector.Error as err:
+    # Error 1060 is "Duplicate column name", meaning it already exists
+    if err.errno != 1060:
+        print(f"Non-fatal error adding title column: {err}")
+
 print("Databrew connection initialized successfully")
 
 
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
+
+
+#####################
+# DATABREW FUNCTIONS
+#####################
+
+
+def create_brew_request(
+    user_id: str,
+    title: str,
+    temperature: float,
+    flow_rate: float,
+    start_timestamp: datetime,
+    favourite: bool,
+):
+    cursor.execute(
+        """
+    INSERT INTO brew_requests (user_id, title, temperature, flow_rate, start_timestamp, favourite) 
+    VALUES (%s, %s, %s, %s, %s, %s)
+    """,
+        (user_id, title, temperature, flow_rate, start_timestamp, favourite),
+    )
+    databrew_connection.commit()
+    return cursor.lastrowid
+
+
+def favourite_brew_request(brew_id: int, favourite_status: bool):
+    cursor.execute(
+        """
+    UPDATE brew_requests SET favourite = %s WHERE id = %s
+    """,
+        (favourite_status, brew_id),
+    )
+    databrew_connection.commit()
+    return
+
+
+def get_user_brew_requests(user_id: str, number_of_requests: int):
+    cursor.execute(
+        """
+    SELECT id, user_id, title, temperature, flow_rate, start_timestamp, favourite 
+    FROM brew_requests 
+    WHERE user_id = %s 
+    ORDER BY start_timestamp DESC 
+    LIMIT %s
+    """,
+        (user_id, number_of_requests),
+    )
+    return cursor.fetchall()
+
+
+def get_user_favourites(user_id: str):
+    cursor.execute(
+        """
+    SELECT id, user_id, title, temperature, flow_rate, start_timestamp, favourite 
+    FROM brew_requests 
+    WHERE user_id = %s AND favourite = TRUE
+    ORDER BY start_timestamp DESC
+    """,
+        (user_id,),
+    )
+    return cursor.fetchall()
 
 
 #####################
@@ -179,7 +266,7 @@ async def get_telemetry_data(request: Request, token: str = Query(...)):
     app.state.SSE_QUEUES.add(queue)
 
     async def sse_generator():
-        yield f"data: {json.dumps({'type': 'connected'})}\n\n"
+        yield f"data: {json.dumps({'type': 'connected', 'brew_status': bool(app.state.ACTIVE_BREW)})}\n\n"
         try:
             while True:
                 if await request.is_disconnected():
@@ -211,9 +298,10 @@ async def receive_telemetry(request: Request):
 
     Expected packet format:
     {
-        "sender_id" : Sender.HOMEBREW
+        "sender_id" : Sender.HOMEBREW,
         "type" : "telemetry",
-        <READINGS>
+        "temperature" : <TEMPERATURE>,
+        "flow_rate" : <FLOW RATE>
     }
     """
     try:
@@ -262,20 +350,37 @@ async def receive_telemetry(request: Request):
 
 # Running a web server on homebrew is unviable so it just polls every second or so for the current brew
 @app.get("/homebrew/brew")
-async def get_homebrew_brew():
+async def get_homebrew_brew(request: Request):
     """
     Polled by Homebrew to check for pending brew commands.
     Returns the active brew target or an ACK if no brew is active.
     """
+    accept_header = request.headers.get("accept", "")
 
     if app.state.ACTIVE_BREW is not None:
-        return Packet(
+        payload = {
+            "target_temperature": app.state.ACTIVE_BREW["target_temperature"],
+        }
+        if "started_at" in app.state.ACTIVE_BREW:
+            payload["started_at"] = app.state.ACTIVE_BREW["started_at"].isoformat()
+
+        packet = Packet(
             sender_id=Sender.AWAYBREW,
             type="brew",
-            payload={"target_temperature": app.state.ACTIVE_BREW["target_temperature"]},
-        ).to_response()
+            payload=payload,
+        )
+        if "application/json" in accept_header:
+            return Response(
+                content=json.dumps(packet.to_dict()), media_type="application/json"
+            )
+        return packet.to_response()
 
-    return Packet.ack(Sender.AWAYBREW).to_response()
+    packet = Packet.ack(Sender.AWAYBREW)
+    if "application/json" in accept_header:
+        return Response(
+            content=json.dumps(packet.to_dict()), media_type="application/json"
+        )
+    return packet.to_response()
 
 
 ##################################################
@@ -289,18 +394,15 @@ async def get_homebrew_brew():
 async def brew(request: Request):
     """
     Receives a brew request from Overbrew. Returns "brew accepted" or error messages when applicable.
-    If Overbrew requests that a profile is created, this function will populate Databrew with the new profile.
 
     Expected packet format:
     {
         "sender_id" : Sender.OVERBREW,
         "type" : "brew",
         "user_id" : <ID OF THE USER LOGGED IN>
-        "create_profile" : True | False,
 
         "temperature" : <TARGET TEMPERATURE>
-
-        "intent" : <Intent for the MCP server>
+        "flow_rate" : <TARGET FLOW RATE>
     }
     """
 
@@ -321,8 +423,7 @@ async def brew(request: Request):
     sender_id = msg.get("sender_id")
     msg_type = msg.get("type")
     user_id = msg.get("user_id")
-    create_profile = msg.get("create_profile")
-    intent = msg.get("intent")
+    title = msg.get("title", "My Brew")
 
     target_temperature = msg.get("temperature")
     flow_rate = msg.get("flow_rate")
@@ -335,14 +436,11 @@ async def brew(request: Request):
         )
 
     if (
-        not isinstance(create_profile, bool)
-        or not isinstance(intent, str)
-        or not isinstance(target_temperature, (float, int))
+        not isinstance(target_temperature, (float, int))
         or not isinstance(flow_rate, (float, int))
         or not sender_id
         or not msg_type
         or not user_id
-        or not intent
     ):
         return Response(
             content='{"type":"error","error":"invalid_payload"}',
@@ -357,7 +455,6 @@ async def brew(request: Request):
     # TODO: Decide on payload for the MCP server
     _ = {
         "sender_id": Sender.AWAYBREW,
-        "intent": intent,
         "context": context,
         "constraints": constraints,
     }
@@ -385,15 +482,154 @@ async def brew(request: Request):
         },
     )
 
-    # TODO: enqueue into DB here
-    if create_profile:
-        pass
+    db_id = create_brew_request(
+        user_id=user_id,
+        title=title,
+        temperature=float(target_temperature),
+        flow_rate=float(flow_rate),
+        start_timestamp=datetime.now(),
+        favourite=False,
+    )
 
     return {
         "sender_id": Sender.AWAYBREW,
         "type": "brew_started",
         "request_id": request_id,
+        "id": db_id,
     }
+
+
+@app.put("/favourite_brew")
+async def favourite_brew(request: Request):
+    """
+    Label/unlabel a brew as a "favourite" brew. Favourited brews are surfaced. Return a message if successful
+    at the top of the frontend service.
+
+    Expected packet format:
+    {
+        "sender_id" : Sender.OVERBREW,
+        "type" : "favourite",
+        "brew_id" : <BREW ID>,
+        "user_id" : <USER ID>,
+        "toggle_favourite" : True | False
+    }
+    """
+
+    try:
+        msg = await request.json()
+    except Exception:
+        return Response(
+            content='{"error":"invalid_json"}',
+            media_type="application/json",
+            status_code=400,
+        )
+
+    sender_id = msg.get("sender_id")
+    msg_type = msg.get("type")
+    brew_id = msg.get("brew_id")
+    user_id = msg.get("user_id")
+    toggle_favourite = msg.get("toggle_favourite")
+
+    if (
+        sender_id != Sender.OVERBREW
+        or msg_type != "favourite"
+        or not isinstance(msg, dict)
+        or not brew_id
+        or not user_id
+        or toggle_favourite is None
+    ):
+        return Response(
+            content='{"type":"error","error":"invalid_message"}',
+            media_type="application/json",
+            status_code=400,
+        )
+
+    print(f"Received: {msg}")
+
+    favourite_brew_request(brew_id=brew_id, favourite_status=toggle_favourite)
+
+    return {
+        "sender_id": Sender.AWAYBREW,
+        "type": "brew favourite status changed to " + str(toggle_favourite),
+        "brew_id": brew_id,
+    }
+
+
+#####################
+# DATABREW ENDPOINTS
+#####################
+
+
+@app.get("/fetch-recents/{user_id}")
+async def fetch_recent_brews(user_id: str):
+    """
+    Fetch a list of the most recent brews from Databrew
+    """
+
+    brews = get_user_brew_requests(
+        user_id=user_id, number_of_requests=MAXIMUM_NUMBER_OF_BREW_REQUESTS
+    )
+
+    return {
+        "sender_id": Sender.AWAYBREW,
+        "type": "fetched recent brews",
+        "brews": brews,
+    }
+
+
+@app.get("/fetch-favourites/{user_id}")
+async def fetch_favourites(user_id: str):
+    """
+    Fetch a list of favourited brews from Databrew
+    """
+
+    favourites = get_user_favourites(user_id=user_id)
+
+    return {
+        "sender_id": Sender.AWAYBREW,
+        "type": "fetched favourites",
+        "favourites": favourites,
+    }
+
+
+@app.post("/abort")
+async def abort_brew(request: Request):
+    """
+    Sets the active brew to None, which signals Homebrew to stop the brew and resets the state for the next brew.
+    """
+    try:
+        msg = await request.json()
+    except Exception:
+        return Response(
+            content='{"error":"invalid_json"}',
+            media_type="application/json",
+            status_code=400,
+        )
+
+    sender_id = msg.get("sender_id")
+    user_id = msg.get("user_id")
+
+    if sender_id != Sender.OVERBREW or not user_id:
+        return Response(
+            content='{"type":"error","error":"invalid_message"}',
+            media_type="application/json",
+            status_code=400,
+        )
+
+    print(f"Received abort request from user {user_id}")
+
+    app.state.ACTIVE_BREW = None
+
+    await broadcast(
+        {
+            "type": "brew_aborted",
+            "request_id": app.state.ACTIVE_BREW["request_id"]
+            if app.state.ACTIVE_BREW
+            else None,
+        },
+    )
+
+    return {"status": "aborted"}
 
 
 #####################
@@ -425,12 +661,6 @@ async def brew_status(request_id: str):
     res = copy.deepcopy(job)
 
     return Packet(Sender.AWAYBREW, "brew status", res).to_response()
-
-
-# TODO: check if this is even neccessary. Could be that the other functions work just fine.
-@app.post("/mcp")
-async def mcp_endpoint_stub(request: Request):
-    return Packet.ack(Sender.AWAYBREW).to_response()
 
 
 ##########
