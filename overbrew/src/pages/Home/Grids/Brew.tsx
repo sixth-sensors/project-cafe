@@ -52,9 +52,18 @@ const Brew = () => {
           const recents = recentsRes.brews || []
           const favourites = favouritesRes.favourites || []
 
+          interface BrewItemProps {
+            id: string | number
+            title?: string
+            temperature: number
+            flow_rate: number
+            favourite?: boolean | number
+            start_timestamp: string
+          }
+
           const allBrewsMap = new Map<string, Brew>()
 
-          recents.forEach((item: any) => {
+          recents.forEach((item: BrewItemProps) => {
             allBrewsMap.set(String(item.id), {
               id: String(item.id),
               title: item.title || 'Recent Brew',
@@ -67,7 +76,7 @@ const Brew = () => {
             })
           })
 
-          favourites.forEach((item: any) => {
+          favourites.forEach((item: BrewItemProps) => {
             allBrewsMap.set(String(item.id), {
               id: String(item.id),
               title: item.title || 'Favourite Brew',
@@ -303,9 +312,9 @@ const Brew = () => {
           <div className="brew-start-panel">
             <h2>Start Brew</h2>
             <button
+              disabled={brewActive}
               onClick={handleStartBrew}
               type="button"
-              disabled={brewActive}
             >
               <FaPlay size={24} />
             </button>

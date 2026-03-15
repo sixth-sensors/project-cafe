@@ -43,8 +43,11 @@ const Info = () => {
     switch (latest?.type) {
       case 'brew_finished':
       case 'brew_aborted':
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setProgress(0)
+
         setFlowRate(0.0)
+
         setTemperatureData([])
         break
       case 'telemetry':

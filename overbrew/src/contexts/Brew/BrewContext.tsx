@@ -1,14 +1,7 @@
-import { createContext, useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useTelemetryStream } from '../../hooks/useTelemetryStream'
 import { BASE_URL } from '../../lib/api'
-import type { BrewContextType } from './BrewContext.types'
-
-export const BrewContext = createContext<BrewContextType>({
-  brewActive: false,
-  brewStartTime: null,
-  connected: false,
-  latest: null,
-})
+import { BrewContext } from './context'
 
 export const BrewProvider = ({ children }: { children: ReactNode }) => {
   const { connected, latest } = useTelemetryStream()
@@ -48,16 +41,19 @@ export const BrewProvider = ({ children }: { children: ReactNode }) => {
     switch (latest?.type) {
       case 'connected':
         if (latest.brew_status !== undefined) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setBrewActive(latest.brew_status)
         }
         break
       case 'brew_started':
         setBrewActive(true)
+
         setBrewStartTime(new Date())
         break
       case 'brew_finished':
       case 'brew_aborted':
         setBrewActive(false)
+
         setBrewStartTime(null)
         break
     }
