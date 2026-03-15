@@ -6,9 +6,15 @@ type BrewButtonProps = {
   settings: BrewSettings
   timestamp: string
   isFavorite: boolean
-  onClick: (settings: BrewSettings) => void
+  onClick: (settings: BrewSettings, title: string) => void
   onToggleFavorite: () => void
 }
+
+export const SkeletonBrewButton = () => (
+  <div className="brew-button-wrapper skeleton-wrapper">
+    <div className="skeleton-box main-box" />
+  </div>
+)
 
 const BrewButton = ({
   title,
@@ -25,7 +31,7 @@ const BrewButton = ({
       <div className="brew-button-container">
         <button
           className="brew-button"
-          onClick={() => onClick(settings)}
+          onClick={() => onClick(settings, title)}
           type="button"
         >
           <div className="brew-button-content">

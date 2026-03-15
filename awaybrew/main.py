@@ -86,12 +86,21 @@ cursor.execute("""
     CREATE TABLE IF NOT EXISTS brew_requests (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id VARCHAR(64) NOT NULL,
+        title VARCHAR(255) DEFAULT 'My Brew',
         temperature FLOAT NOT NULL,
         flow_rate FLOAT NOT NULL,
         start_timestamp TIMESTAMP NOT NULL,
         favourite BOOLEAN DEFAULT FALSE
     )
     """)
+
+# Attempt to gracefully alter the table if it already exists from a previous step
+try:
+    cursor.execute("ALTER TABLE brew_requests ADD COLUMN title VARCHAR(255) DEFAULT 'My Brew'")
+except mysql.connector.Error as err:
+    # Error 1060 is "Duplicate column name", meaning it already exists
+    if err.errno != 1060:
+        print(f"Non-fatal error adding title column: {err}")
 
 print("Databrew connection initialized successfully")
 
@@ -104,13 +113,13 @@ def read_root():
 # DATABREW FUNCTIONS
 #####################
 
-def create_brew_request(user_id: str, temperature: float, flow_rate: float, start_timestamp: datetime, favourite: bool):
+def create_brew_request(user_id: str, title: str, temperature: float, flow_rate: float, start_timestamp: datetime, favourite: bool):
     cursor.execute("""
-    INSERT INTO brew_requests (user_id, temperature, flow_rate, start_timestamp, favourite) 
-    VALUES (%s, %s, %s, %s, %s)
-    """, (user_id, temperature, flow_rate, start_timestamp, favourite))
+    INSERT INTO brew_requests (user_id, title, temperature, flow_rate, start_timestamp, favourite) 
+    VALUES (%s, %s, %s, %s, %s, %s)
+    """, (user_id, title, temperature, flow_rate, start_timestamp, favourite))
     databrew_connection.commit()
-    return
+    return cursor.lastrowid
 
 def favourite_brew_request(brew_id: int, favourite_status: bool):
     cursor.execute("""
@@ -121,7 +130,7 @@ def favourite_brew_request(brew_id: int, favourite_status: bool):
 
 def get_user_brew_requests(user_id: str, number_of_requests: int):
     cursor.execute("""
-    SELECT id, temperature, flow_rate, start_timestamp, favourite 
+    SELECT id, user_id, title, temperature, flow_rate, start_timestamp, favourite 
     FROM brew_requests 
     WHERE user_id = %s 
     ORDER BY start_timestamp DESC 
@@ -131,7 +140,7 @@ def get_user_brew_requests(user_id: str, number_of_requests: int):
 
 def get_user_favourites(user_id: str):
     cursor.execute("""
-    SELECT id, temperature, flow_rate, start_timestamp, favourite 
+    SELECT id, user_id, title, temperature, flow_rate, start_timestamp, favourite 
     FROM brew_requests 
     WHERE user_id = %s AND favourite = TRUE
     ORDER BY start_timestamp DESC
@@ -350,8 +359,6 @@ async def brew(request: Request):
 
         "temperature" : <TARGET TEMPERATURE>
         "flow_rate" : <TARGET FLOW RATE>
-
-        "intent" : <Intent for the MCP server>
     }
     """
 
@@ -372,7 +379,7 @@ async def brew(request: Request):
     sender_id = msg.get("sender_id")
     msg_type = msg.get("type")
     user_id = msg.get("user_id")
-    intent = msg.get("intent")
+    title = msg.get("title", "My Brew")
 
     target_temperature = msg.get("temperature")
     flow_rate = msg.get("flow_rate")
@@ -385,13 +392,11 @@ async def brew(request: Request):
         )
 
     if (
-        not isinstance(intent, str)
-        or not isinstance(target_temperature, (float, int))
+        not isinstance(target_temperature, (float, int))
         or not isinstance(flow_rate, (float, int))
         or not sender_id
         or not msg_type
         or not user_id
-        or not intent
     ):
         return Response(
             content='{"type":"error","error":"invalid_payload"}',
@@ -406,7 +411,6 @@ async def brew(request: Request):
     # TODO: Decide on payload for the MCP server
     _ = {
         "sender_id": Sender.AWAYBREW,
-        "intent": intent,
         "context": context,
         "constraints": constraints,
     }
@@ -434,17 +438,18 @@ async def brew(request: Request):
         },
     )
 
-    create_brew_request(user_id=user_id, temperature=float(target_temperature), flow_rate=float(flow_rate), start_timestamp=datetime.now(), favourite=False)
+    db_id = create_brew_request(user_id=user_id, title=title, temperature=float(target_temperature), flow_rate=float(flow_rate), start_timestamp=datetime.now(), favourite=False)
 
     return {
         "sender_id": Sender.AWAYBREW,
         "type": "brew_started",
         "request_id": request_id,
+        "id": db_id,
     }
 
 
 @app.put("/favourite_brew")
-async def favourite_brew(request):
+async def favourite_brew(request: Request):
     """
     Label/unlabel a brew as a "favourite" brew. Favourited brews are surfaced. Return a message if successful
     at the top of the frontend service.
@@ -468,11 +473,11 @@ async def favourite_brew(request):
             status_code=400,
         )
 
-    sender_id = msg["sender_id"]
-    msg_type = msg["type"]
-    brew_id = msg["brew_id"]
-    user_id = msg["user_id"]
-    toggle_favourite = msg["user_id"]
+    sender_id = msg.get("sender_id")
+    msg_type = msg.get("type")
+    brew_id = msg.get("brew_id")
+    user_id = msg.get("user_id")
+    toggle_favourite = msg.get("toggle_favourite")
 
     if (
         sender_id != Sender.OVERBREW
@@ -480,7 +485,7 @@ async def favourite_brew(request):
         or not isinstance(msg, dict)
         or not brew_id
         or not user_id
-        or not toggle_favourite
+        or toggle_favourite is None
     ):
         return Response(
             content='{"type":"error","error":"invalid_message"}',
@@ -495,7 +500,7 @@ async def favourite_brew(request):
     return {
         "sender_id": Sender.AWAYBREW,
         "type": "brew favourite status changed to " + str(toggle_favourite),
-        "request_id": request_id,
+        "brew_id": brew_id,
     }
 
 
