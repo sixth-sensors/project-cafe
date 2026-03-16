@@ -97,7 +97,7 @@ const FlowRateDropper = ({ flowRate }: FlowRateDropperProps) => {
         <img className="pot" src={pot} />
         <div className="pot-flow-rate">
           {`${flowRate.toFixed(1)} `}
-          <span className="pot-flow-rate-unit">g/s</span>
+          <span className="pot-flow-rate-unit">ml/s</span>
         </div>
       </div>
     </div>
