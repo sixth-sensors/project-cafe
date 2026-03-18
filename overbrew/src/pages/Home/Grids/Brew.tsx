@@ -7,7 +7,7 @@ import BrewButton, {
   SkeletonBrewButton,
 } from '../../../components/BrewButton/BrewButton'
 import Slider from '../../../components/Slider/Slider'
-import { FaPlay } from 'react-icons/fa'
+import { FaPlay, FaSignal, FaWifi } from 'react-icons/fa'
 
 export type BrewSettings = {
   temperature: number
@@ -26,7 +26,8 @@ const Brew = () => {
   const { user } = useAuth()
   const { brewActive } = useBrew()
   const [temperature, setTemperature] = useState(60)
-  const [flowRate, setFlowRate] = useState(0.1)
+  const [flowRate, setFlowRate] = useState(1)
+  const [quantity, setQuantity] = useState(30)
   const [brewName, setBrewName] = useState('')
   const [brews, setBrews] = useState<Brew[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -117,7 +118,6 @@ const Brew = () => {
 
     const newFavoriteStatus = !brew.isFavorite
 
-    // Update optimistically
     setBrews((currentBrews) =>
       currentBrews.map((b) =>
         b.id === id
@@ -141,8 +141,11 @@ const Brew = () => {
         }),
       })
     } catch (error) {
-      // Roll back if failed
-      console.error('Failed to update favorite status:', error)
+      console.error(
+        'Failed to update favorite status: ',
+        error,
+        'Reverting change.'
+      )
       setBrews((currentBrews) =>
         currentBrews.map((b) =>
           b.id === id
@@ -257,7 +260,13 @@ const Brew = () => {
       <div className="grid brew-right">
         <div className="card brew-settings">
           <div className="brew-settings-screen">
-            <span className="settings-header" />
+            <span className="settings-header">
+              <p>BrewNet</p>
+              <div>
+                <FaWifi size={13} />
+                <FaSignal size={13} />
+              </div>
+            </span>
             <div className="settings-content">
               <h2>Brew Settings</h2>
               <div className="sliders-container">
@@ -268,18 +277,26 @@ const Brew = () => {
                   max={100}
                   min={60}
                   onChange={setTemperature}
-                  step={1}
                   value={temperature}
                 />
                 <Slider
                   gradientMax="var(--dark-brown)"
                   gradientMin="var(--lighter-brown)"
-                  label="Flow Rate (g/s)"
-                  max={4.0}
-                  min={0.1}
+                  label="Flow Rate (ml/s)"
+                  max={25}
+                  min={1}
                   onChange={setFlowRate}
-                  step={0.1}
                   value={flowRate}
+                />
+                <Slider
+                  gradientMax="#000f93"
+                  gradientMin="#BFFAFF"
+                  label="Quantity (ml)"
+                  max={1400}
+                  min={30}
+                  onChange={setQuantity}
+                  step={1}
+                  value={quantity}
                 />
               </div>
             </div>
@@ -287,16 +304,15 @@ const Brew = () => {
         </div>
         <div className="card brew-preview-card">
           <div className="brew-preview">
-            <h2>Brew Summary</h2>
+            <div className="brew-preview-header">
+              <h2>Brew Name:</h2>
+              <input
+                onChange={(e) => setBrewName(e.target.value)}
+                placeholder="My Brew"
+                value={brewName}
+              />
+            </div>
             <div className="brew-preview-settings">
-              <div className="brew-detail">
-                <h2>Brew Name:</h2>
-                <input
-                  onChange={(e) => setBrewName(e.target.value)}
-                  placeholder="My Brew"
-                  value={brewName}
-                />
-              </div>
               <div className="brew-details">
                 <div className="brew-detail">
                   <h2>Temperature:</h2>
@@ -304,7 +320,11 @@ const Brew = () => {
                 </div>
                 <div className="brew-detail">
                   <h2>Flow Rate:</h2>
-                  <p>{`${flowRate.toFixed(1)}g/s`}</p>
+                  <p>{`${flowRate.toFixed(1)}ml/s`}</p>
+                </div>
+                <div className="brew-detail">
+                  <h2>Quantity:</h2>
+                  <p>{`${quantity}ml`}</p>
                 </div>
               </div>
             </div>
