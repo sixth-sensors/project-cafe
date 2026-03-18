@@ -72,8 +72,8 @@ bearer_scheme = HTTPBearer()
 
 # Initialize Databrew connection pool
 databrew_pool = mysql.connector.pooling.MySQLConnectionPool(
-    pool_name = "databrew_pool",
-    pool_size = 5,
+    pool_name="databrew_pool",
+    pool_size=5,
     host=os.getenv("DB_HOST"),
     port=os.getenv("DB_PORT"),
     user=os.getenv("DB_USER"),
@@ -106,12 +106,12 @@ try:
         # Error 1060 is "Duplicate column name", meaning it already exists
         if err.errno != 1060:
             print(f"Non-fatal error adding title column: {err}")
-    
+
     connection.commit()
 finally:
-    if 'cursor' in locals():
+    if "cursor" in locals():
         cursor.close()
-    if 'connection' in locals() and connection.is_connected():
+    if "connection" in locals() and connection.is_connected():
         connection.close()
 
 print("Databrew connection initialized successfully")
