@@ -439,6 +439,8 @@ async def brew(request: Request):
 
         "temperature" : <TARGET TEMPERATURE>
         "flow_rate" : <TARGET FLOW RATE>
+
+        "intent" : <Intent for the MCP server>
     }
     """
 
