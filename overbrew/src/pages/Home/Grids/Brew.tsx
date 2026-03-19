@@ -12,6 +12,7 @@ import { FaPlay, FaSignal, FaWifi } from 'react-icons/fa'
 export type BrewSettings = {
   temperature: number
   flowRate: number
+  quantity: number
 }
 
 type Brew = {
@@ -58,6 +59,7 @@ const Brew = () => {
             title?: string
             temperature: number
             flow_rate: number
+            quantity?: number
             favourite?: boolean | number
             start_timestamp: string
           }
@@ -71,6 +73,7 @@ const Brew = () => {
               settings: {
                 temperature: item.temperature,
                 flowRate: item.flow_rate,
+                quantity: item.quantity ?? 30,
               },
               isFavorite: Boolean(item.favourite),
               timestamp: item.start_timestamp,
@@ -84,6 +87,7 @@ const Brew = () => {
               settings: {
                 temperature: item.temperature,
                 flowRate: item.flow_rate,
+                quantity: item.quantity ?? 30,
               },
               isFavorite: true,
               timestamp: item.start_timestamp,
@@ -162,6 +166,7 @@ const Brew = () => {
   const handleBrewSelect = (settings: BrewSettings, title: string) => {
     setTemperature(settings.temperature)
     setFlowRate(settings.flowRate)
+    setQuantity(settings.quantity)
     setBrewName(title)
   }
 
@@ -178,6 +183,7 @@ const Brew = () => {
           title: brewName || 'My Brew',
           temperature,
           flow_rate: flowRate,
+          quantity,
         }),
       })
 
@@ -188,6 +194,7 @@ const Brew = () => {
           settings: {
             temperature,
             flowRate,
+            quantity,
           },
           isFavorite: false,
           timestamp: new Date().toISOString(),
