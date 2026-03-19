@@ -465,6 +465,7 @@ async def brew(request: Request):
 
     target_temperature = msg.get("temperature")
     flow_rate = msg.get("flow_rate")
+    quantity = msg.get("quantity")
 
     if sender_id != Sender.OVERBREW or msg_type != "brew":
         return Response(
@@ -476,6 +477,7 @@ async def brew(request: Request):
     if (
         not isinstance(target_temperature, (float, int))
         or not isinstance(flow_rate, (float, int))
+        or not isinstance(quantity, (float, int))
         or not sender_id
         or not msg_type
         or not user_id
@@ -509,6 +511,7 @@ async def brew(request: Request):
         "request_id": request_id,
         "target_temperature": float(target_temperature),
         "flow_rate": float(flow_rate),
+        "quantity": float(quantity),
         "started_at": datetime.now(),
     }
 
