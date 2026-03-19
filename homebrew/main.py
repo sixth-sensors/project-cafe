@@ -18,6 +18,13 @@ class Sender:
     AUTOBREW = 3
 
 
+class BrewPhase:
+    IDLE = "idle"
+    HEATING = "heating"
+    PUMPING = "pumping"
+    COMPLETE = "complete"
+
+
 class Homebrew:
     WIFI_SSID = "Mia"
     WIFI_PASSWORD = "password"
@@ -29,10 +36,14 @@ class Homebrew:
     AWAYBREW_HOST = "cafe.miarolfe.com"
     PLUGBREW_MAC = "14:08:08:69:4F:FF"
 
+    BREW_MSG_REQUIRED_KEYS = {"sender_id", "type", "target_temperature"}
+    BREW_MSG_OPTIONAL_KEYS = {"flow_rate", "quantity"}
     BREW_MSG_SCHEMA = {
         "sender_id": Sender.AWAYBREW,
         "type": "brew",
         "target_temperature": 0.0,
+        "flow_rate": 0.0,
+        "quantity": 0.0,
     }
     TELEMETRY_MSG_SCHEMA = {
         "sender_id": Sender.HOMEBREW,
@@ -45,10 +56,20 @@ class Homebrew:
     ACCEPTABLE_MIN_TEMPERATURE_DEGREES_CELSIUS = 0.0  # temporary value
     ACCEPTABLE_MAX_TEMPERATURE_DEGREES_CELSIUS = 100.0  # temporary value
     ACCEPTABLE_TEMPERATURE_MARGIN_DEGREES_CELSIUS = 1.0
+    TEMP_SENSOR_PIN_NUMBER = 4
+    PUMP_PIN_NUMBER = 3
+    PUMP_DUTY_ALL_OFF = 0
+    PUMP_DUTY_ALL_ON = 1023
+    MAX_BREW_BASKET_ML = 425
+    MAX_KETTLE_ML = 1000
+    MAX_KETTLE_TO_BASKET_FLOW_RATE_ML_PER_SEC = 25
+    MAX_BASKET_TO_POT_FLOW_RATE_ML_PER_SEC = 0.83
 
     def __init__(self):
-        self.temp_sensor_pin = machine.Pin(3)
+        self.temp_sensor_pin = machine.Pin(self.TEMP_SENSOR_PIN_NUMBER)
         self.temp_sensor = ds18x20.DS18X20(onewire.OneWire(self.temp_sensor_pin))
+        self.pump_pin = machine.Pin(self.PUMP_PIN_NUMBER, mode=machine.Pin.OUT)
+        self.pump = machine.PWM(self.pump_pin, freq=1000)
         self.temp_results = self.temp_sensor.scan()
         self.wlan_interface = WLAN(WLAN.IF_STA)
         self.plugbrew_ip_address = None
@@ -56,6 +77,12 @@ class Homebrew:
         self.target_temperature = None
         self.plug_is_on = False
         self.last_valid_temp = None
+        # Brew state machine
+        self.brew_phase = BrewPhase.IDLE
+        self.brew_flow_rate = 0.0  # ml/sec from order
+        self.brew_quantity = 0.0  # ml total to transfer
+        self.volume_transferred = 0.0  # ml accumulated
+        self.last_pump_ticks = None  # time.ticks_ms() snapshot
 
     def _find_plugbrew_ip(self):
         homebrew_ip, _, _, _ = self.wlan_interface.ifconfig()
@@ -192,9 +219,13 @@ class Homebrew:
             return False
 
         def validate_brew_msg(brew_msg):
-            valid_keys = set(self.BREW_MSG_SCHEMA.keys())
-            are_keys_valid = set(brew_msg.keys()) == valid_keys
-            if not are_keys_valid:
+            msg_keys = set(brew_msg.keys())
+            all_valid_keys = self.BREW_MSG_REQUIRED_KEYS | self.BREW_MSG_OPTIONAL_KEYS
+            if not self.BREW_MSG_REQUIRED_KEYS.issubset(msg_keys):
+                print("Missing required brew msg keys")
+                return False
+            if not msg_keys.issubset(all_valid_keys):
+                print("Unknown keys in brew msg")
                 return False
 
             is_sender_valid = int(brew_msg["sender_id"]) == int(
@@ -216,6 +247,29 @@ class Homebrew:
             ):
                 print("Invalid target temperature")
                 return False
+
+            if "flow_rate" in brew_msg:
+                if not isinstance(brew_msg["flow_rate"], (float, int)):
+                    print("Flow rate is not a number")
+                    return False
+                if (
+                    brew_msg["flow_rate"] < 0
+                    or brew_msg["flow_rate"]
+                    > self.MAX_KETTLE_TO_BASKET_FLOW_RATE_ML_PER_SEC
+                ):
+                    print("Flow rate out of range")
+                    return False
+
+            if "quantity" in brew_msg:
+                if not isinstance(brew_msg["quantity"], (float, int)):
+                    print("Quantity is not a number")
+                    return False
+                if (
+                    brew_msg["quantity"] < 0
+                    or brew_msg["quantity"] > self.MAX_COFFEE_POT_ML
+                ):
+                    print("Quantity out of range")
+                    return False
 
             return True
 
@@ -266,6 +320,24 @@ class Homebrew:
 
         return True
 
+    def _set_pump_percent(self, percent):
+        percent = max(0, percent)
+        percent = min(100, percent)
+
+        duty_val = int((1 - percent / 100) * self.PUMP_DUTY_ALL_ON)
+        self.pump.duty(duty_val)
+
+    def _reset_brew_state(self):
+        self.target_temperature = None
+        self.brew_phase = BrewPhase.IDLE
+        self.brew_flow_rate = 0.0
+        self.brew_quantity = 0.0
+        self.volume_transferred = 0.0
+        self.last_pump_ticks = None
+        self._set_pump_percent(0)
+        self._set_plug_enabled(False)
+        self.plug_is_on = False
+
     def _handle_instructions(self, response):
         if response is None:
             return
@@ -274,9 +346,7 @@ class Homebrew:
             # No active brew
             if self.target_temperature is not None:
                 print("Brew cleared")
-                self.target_temperature = None
-                self._set_plug_enabled(False)
-                self.plug_is_on = False
+                self._reset_brew_state()
             return
 
         if not self._validate_msg(response):
@@ -284,9 +354,46 @@ class Homebrew:
             return
 
         new_target = response["target_temperature"]
+        flow_rate = float(response.get("flow_rate", 0.0))
+        quantity = float(response.get("quantity", 0.0))
+
         if self.target_temperature != new_target:
             print(f"New target temperature: {new_target}C")
         self.target_temperature = new_target
+
+        # Only start brew state machine if this is a new brew with pump params
+        if flow_rate > 0 and quantity > 0 and self.brew_phase == BrewPhase.IDLE:
+            self.brew_flow_rate = flow_rate
+            self.brew_quantity = quantity
+            self.volume_transferred = 0.0
+            self.brew_phase = BrewPhase.HEATING
+            print(f"Brew started: {quantity}ml at {flow_rate}ml/s")
+
+    def _execute_brew_phase(self, current_temp):
+        if self.brew_phase == BrewPhase.IDLE or self.brew_phase == BrewPhase.COMPLETE:
+            return
+
+        if self.brew_phase == BrewPhase.HEATING:
+            if current_temp is not None and current_temp >= self.target_temperature:
+                pump_percent = (
+                    self.brew_flow_rate / self.MAX_KETTLE_TO_BASKET_FLOW_RATE_ML_PER_SEC
+                ) * 100
+                self._set_pump_percent(pump_percent)
+                self.last_pump_ticks = time.ticks_ms()
+                self.brew_phase = BrewPhase.PUMPING
+                print(f"Target temp reached, pumping at {pump_percent:.1f}%")
+
+        elif self.brew_phase == BrewPhase.PUMPING:
+            now = time.ticks_ms()
+            elapsed_ms = time.ticks_diff(now, self.last_pump_ticks)
+            self.last_pump_ticks = now
+            self.volume_transferred += self.brew_flow_rate * (elapsed_ms / 1000.0)
+            print(f"Volume: {self.volume_transferred:.1f}/{self.brew_quantity:.1f}ml")
+
+            if self.volume_transferred >= self.brew_quantity:
+                self._set_pump_percent(0)
+                self.brew_phase = BrewPhase.COMPLETE
+                print(f"Brew complete: {self.volume_transferred:.1f}ml transferred")
 
     def _control_temperature(self, current_temp):
         if self.target_temperature is None or current_temp is None:
@@ -373,8 +480,9 @@ class Homebrew:
     def run(self):
         print("--- HOMEBREW ---")
 
-        self._setup_connectivity()
-        self._set_plug_enabled(False)
+        # self._setup_connectivity()
+        # self._set_plug_enabled(False)
+        self._set_pump_percent(0)
 
         # Main loop
         while True:
@@ -385,7 +493,9 @@ class Homebrew:
                     "sender_id": Sender.HOMEBREW,
                     "type": "telemetry",
                     "temp": current_temperature,
-                    "flow_rate": 0.0,
+                    "flow_rate": self.brew_flow_rate
+                    if self.brew_phase == BrewPhase.PUMPING
+                    else 0.0,
                 }
 
                 if self._validate_msg(telemetry_msg):
@@ -394,6 +504,7 @@ class Homebrew:
             self._handle_instructions(self._poll_brew())
 
             self._control_temperature(current_temperature)
+            self._execute_brew_phase(current_temperature)
 
             time.sleep(self.POLLING_INTERVAL_SECONDS)
 
