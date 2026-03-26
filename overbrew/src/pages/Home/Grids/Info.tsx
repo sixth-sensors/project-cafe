@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { TARGET_TEMPERATURE } from '../../../constants/temperature'
 import LineChart from '../../../components/LineChart/LineChart'
 import ProgressBar from '../../../components/ProgressBar/ProgressBar'
 import FlowRateDropper from '../../../components/FlowRateDropper/FlowRateDropper'
@@ -24,6 +23,7 @@ const Info = () => {
   const [temperatureData, setTemperatureData] = useState<TemperatureData[]>([])
   const [progress, setProgress] = useState(0.0)
   const [flowRate, setFlowRate] = useState(0.0)
+  const [waterLevel, setWaterLevel] = useState(100)
 
   const handleAbort = async () => {
     if (!user || !confirm('Are you sure you want to abort the current brew?'))
@@ -51,6 +51,7 @@ const Info = () => {
         setTemperatureData([])
         break
       case 'telemetry':
+        setFlowRate(latest.flow_rate ?? 0.0)
         setTemperatureData((prev) => [
           ...prev,
           {
@@ -71,7 +72,6 @@ const Info = () => {
     const interval = setInterval(() => {
       if (brewActive) {
         setProgress((prev) => (prev < 1.0 ? Math.min(1, prev + 0.02) : prev))
-        setFlowRate((prev) => (prev < 4.0 ? Math.min(4, prev + 0.1) : prev))
       }
     }, 2000)
 
@@ -102,7 +102,7 @@ const Info = () => {
         </div>
         <div className="grid info-bottom">
           <div className="card water-level">
-            <WaterLevel percentage={progress * 100} />
+            <WaterLevel percentage={waterLevel} />
           </div>
           <div className="card dropper">
             <FlowRateDropper flowRate={flowRate} />
@@ -110,7 +110,7 @@ const Info = () => {
           <div className="card">
             <LineChart
               data={temperatureData}
-              target={temperatureData[0]?.target_temp ?? TARGET_TEMPERATURE}
+              target={temperatureData[0]?.target_temp ?? 0}
             />
           </div>
         </div>
