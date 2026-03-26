@@ -152,4 +152,3 @@ def get_user_favourites(user_id: str):
         return results
     finally:
         connection.close()
-

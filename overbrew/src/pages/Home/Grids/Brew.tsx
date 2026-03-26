@@ -63,7 +63,7 @@ const Brew = () => {
     {
       id: 'seed-assistant',
       role: 'assistant',
-      text: "Hi there! I'm Joe - your personal brew assistant. Tell me about the kind of coffee you want, and I\'ll help you craft the perfect brew!",
+      text: "Hi there! I'm Joe - your personal brew assistant. Tell me about the kind of coffee you want, and I'll help you craft the perfect brew!",
     },
   ])
 

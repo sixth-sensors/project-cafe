@@ -17,7 +17,12 @@ from ai import (
     normalize_ai_output,
     clamp,
 )
-from db import create_brew_request, favourite_brew_request, get_user_brew_requests, get_user_favourites
+from db import (
+    create_brew_request,
+    favourite_brew_request,
+    get_user_brew_requests,
+    get_user_favourites,
+)
 from dotenv import load_dotenv
 
 import asyncio
@@ -32,7 +37,6 @@ from utils.sender import Sender
 
 MAXIMUM_NUMBER_OF_BREW_REQUESTS = 10
 DEFAULT_BREW_QUANTITY_ML = 30.0
-
 
 
 # Load environment variables
@@ -86,6 +90,7 @@ firebase_admin.initialize_app(cred)
 print("Firebase Admin initialized successfully")
 
 bearer_scheme = HTTPBearer()
+
 
 @app.get("/")
 def read_root():
@@ -447,6 +452,7 @@ async def brew(request: Request):
         "started_at": datetime.now(),
     }
 
+
 @app.post("/ai/chat")
 async def ai_chat(request: Request, token: dict = Depends(verify_token)):
     try:
@@ -529,16 +535,27 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
 
     context_lines = []
     if recent_brews:
-        context_lines.append("### User's Recent Brews:\n" + "\n".join(format_brew(b) for b in recent_brews))
+        context_lines.append(
+            "### User's Recent Brews:\n"
+            + "\n".join(format_brew(b) for b in recent_brews)
+        )
     if favourite_brews:
-        context_lines.append("### User's Favourite Brews:\n" + "\n".join(format_brew(b) for b in favourite_brews))
+        context_lines.append(
+            "### User's Favourite Brews:\n"
+            + "\n".join(format_brew(b) for b in favourite_brews)
+        )
 
     if context_lines:
-        context_lines.insert(0, "## User Brew Database Context\nYou have access to the following historical brew data for this user:\n")
-    
+        context_lines.insert(
+            0,
+            "## User Brew Database Context\nYou have access to the following historical brew data for this user:\n",
+        )
+
     additional_context = "\n\n".join(context_lines)
 
-    llm_output = await anthropic_structured_reply(history, additional_context=additional_context)
+    llm_output = await anthropic_structured_reply(
+        history, additional_context=additional_context
+    )
     normalized = normalize_ai_output(llm_output)
 
     fallback = extract_settings_from_text(user_message)
@@ -561,7 +578,9 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
         chat_state["temperature_c"] = resolved_temperature
 
     if resolved_flow_rate is not None:
-        resolved_flow_rate = clamp(resolved_flow_rate, AI_MIN_FLOW_RATE, AI_MAX_FLOW_RATE)
+        resolved_flow_rate = clamp(
+            resolved_flow_rate, AI_MIN_FLOW_RATE, AI_MAX_FLOW_RATE
+        )
         chat_state["flow_rate"] = resolved_flow_rate
 
     if resolved_quantity is not None:
@@ -582,9 +601,9 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
 
     normalized["missing_fields"] = missing_fields
     normalized["needs_more_info"] = len(missing_fields) > 0
-    normalized["brew_now"] = bool(normalized.get("brew_now")) and not normalized[
-        "needs_more_info"
-    ]
+    normalized["brew_now"] = (
+        bool(normalized.get("brew_now")) and not normalized["needs_more_info"]
+    )
 
     assistant_message = str(normalized["assistant_message"])
     history.append({"role": "assistant", "content": assistant_message})
@@ -608,7 +627,7 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
     if normalized["brew_now"]:
         brew_title = normalized.get("brew_title") or "AI Brew"
         is_favourite = bool(normalized.get("save_as_favourite"))
-        
+
         brew_result = await _start_brew_job(
             user_id=user_id,
             title=brew_title,
@@ -622,7 +641,9 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
         response["brew_title"] = brew_title
         response["request_id"] = brew_result["request_id"]
         response["id"] = brew_result["id"]
-    elif bool(normalized.get("save_as_favourite")) and not normalized["needs_more_info"]:
+    elif (
+        bool(normalized.get("save_as_favourite")) and not normalized["needs_more_info"]
+    ):
         brew_title = normalized.get("brew_title") or "Saved AI Brew"
         db_id = create_brew_request(
             user_id=user_id,

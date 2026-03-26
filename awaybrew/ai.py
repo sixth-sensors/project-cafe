@@ -96,6 +96,7 @@ Return strictly this JSON:
 }
 """.strip()
 
+
 def coerce_float(value: Any) -> float | None:
     try:
         if value is None:
@@ -104,8 +105,10 @@ def coerce_float(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
 
+
 def clamp(value: float, lower: float, upper: float) -> float:
     return max(lower, min(upper, value))
+
 
 def extract_json_block(text: str) -> dict[str, Any] | None:
     cleaned = text.strip()
@@ -123,6 +126,7 @@ def extract_json_block(text: str) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         return None
 
+
 def extract_text_from_anthropic(content_blocks: Any) -> str:
     if not isinstance(content_blocks, list):
         return ""
@@ -133,6 +137,7 @@ def extract_text_from_anthropic(content_blocks: Any) -> str:
             if isinstance(block_text, str):
                 text_parts.append(block_text)
     return "\n".join(text_parts).strip()
+
 
 def extract_settings_from_text(message: str) -> dict[str, float | None]:
     lower = message.lower()
@@ -145,13 +150,20 @@ def extract_settings_from_text(message: str) -> dict[str, float | None]:
 
     temperature = coerce_float(temp_match.group(1)) if temp_match else None
     flow_rate = coerce_float(flow_match.group(1)) if flow_match else None
-    
+
     qty_match = re.search(r"(\d{2,3})\s*(?:ml|milliliters?|millilitres?)", lower)
     quantity = coerce_float(qty_match.group(1)) if qty_match else None
 
-    return {"temperature_c": temperature, "flow_rate": flow_rate, "quantity_ml": quantity}
+    return {
+        "temperature_c": temperature,
+        "flow_rate": flow_rate,
+        "quantity_ml": quantity,
+    }
 
-async def anthropic_structured_reply(messages: list[dict[str, str]], additional_context: str = "") -> dict[str, Any]:
+
+async def anthropic_structured_reply(
+    messages: list[dict[str, str]], additional_context: str = ""
+) -> dict[str, Any]:
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         return {
@@ -175,7 +187,8 @@ async def anthropic_structured_reply(messages: list[dict[str, str]], additional_
         "model": ANTHROPIC_MODEL,
         "max_tokens": 350,
         "temperature": 0.2,
-        "system": AI_SYSTEM_PROMPT + ("\n\n" + additional_context if additional_context else ""),
+        "system": AI_SYSTEM_PROMPT
+        + ("\n\n" + additional_context if additional_context else ""),
         "messages": messages,
     }
 
@@ -202,6 +215,7 @@ async def anthropic_structured_reply(messages: list[dict[str, str]], additional_
 
     return parsed
 
+
 def normalize_ai_output(output: dict[str, Any]) -> dict[str, Any]:
     temperature = coerce_float(output.get("temperature_c"))
     flow_rate = coerce_float(output.get("flow_rate"))
@@ -224,7 +238,9 @@ def normalize_ai_output(output: dict[str, Any]) -> dict[str, Any]:
 
     assistant_message = output.get("assistant_message", "")
     if not isinstance(assistant_message, str) or not assistant_message.strip():
-        assistant_message = "Please share your preferred brew temperature, flow rate, and quantity."
+        assistant_message = (
+            "Please share your preferred brew temperature, flow rate, and quantity."
+        )
 
     brew_now = bool(output.get("brew_now")) and len(missing_fields) == 0
 
