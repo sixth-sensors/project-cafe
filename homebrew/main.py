@@ -1,4 +1,5 @@
 import socket
+import ssl
 import time
 
 import ds18x20
@@ -83,6 +84,10 @@ class Homebrew:
         self.brew_quantity = 0.0  # ml total to transfer
         self.volume_transferred = 0.0  # ml accumulated
         self.last_pump_ticks = None  # time.ticks_ms() snapshot
+        # TLS context for awaybrew requests
+        self.ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        self.ssl_ctx.verify_mode = ssl.CERT_REQUIRED
+        self.ssl_ctx.load_verify_locations("gtsr4.pem")
 
     def _find_plugbrew_ip(self):
         homebrew_ip, _, _, _ = self.wlan_interface.ifconfig()
@@ -186,6 +191,7 @@ class Homebrew:
             url,
             data=umsgpack.dumps(msg),
             headers={"Content-Type": "application/msgpack"},
+            ssl=self.ssl_ctx,
         )
         print(f"Sent: {msg}, Response: {req.status_code}")
         req.close()
@@ -194,6 +200,7 @@ class Homebrew:
         url = f"https://{self.AWAYBREW_HOST}/finished"
         req = urequests.get(
             url,
+            ssl=self.ssl_ctx,
         )
         print(f"Sent (done) Response: {req.status_code}")
         req.close()
@@ -201,7 +208,7 @@ class Homebrew:
     def _poll_brew(self):
         url = f"https://{self.AWAYBREW_HOST}/homebrew/brew"
         try:
-            req = urequests.get(url)
+            req = urequests.get(url, ssl=self.ssl_ctx)
             if req.status_code == 200:
                 response = umsgpack.loads(req.content)
                 req.close()
