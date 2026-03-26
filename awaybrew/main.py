@@ -299,18 +299,6 @@ async def receive_telemetry(request: Request):
             }
         )
 
-        if (
-            msg["temp"] is not None
-            and msg["temp"] >= app.state.ACTIVE_BREW["target_temperature"]
-        ):
-            await broadcast(
-                {
-                    "type": "brew_finished",
-                    "request_id": app.state.ACTIVE_BREW["request_id"],
-                }
-            )
-            app.state.ACTIVE_BREW = None
-
     return Packet.ack(Sender.AWAYBREW).to_response()
 
 
@@ -350,6 +338,20 @@ async def get_homebrew_brew(request: Request):
         )
     return packet.to_response()
 
+@app.get("/homebrew/finish")
+async def finish_brew(request: Request):
+    """
+    Called by Homebrew when a brew is finished. Resets the active brew state and broadcasts the update to the frontend.
+    """
+    app.state.ACTIVE_BREW = None
+
+    await broadcast(
+        {
+            "type": "brew_finished",
+        },
+    )
+
+    return Packet.ack(Sender.AWAYBREW).to_response()
 
 ##################################################
 # OVERBREW ENDPOINTS
@@ -743,7 +745,6 @@ async def fetch_favourites(user_id: str):
         "type": "fetched favourites",
         "favourites": favourites,
     }
-
 
 @app.post("/abort")
 async def abort_brew(request: Request):
