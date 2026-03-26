@@ -4,7 +4,8 @@
 
 If you haven't already, [install `uv`](https://docs.astral.sh/uv/getting-started/installation/).
 
-This will create a virtual environment (a "venv") and install dependencies. 
+This will create a virtual environment (a "venv") and install dependencies.
+
 ```bash
 uv sync
 ```
@@ -12,13 +13,15 @@ uv sync
 Activate the venv:
 
 Linux:
+
 ```bash
 source .venv/bin/activate
 ```
 
 Windows:
+
 ```ps
-.venv\Scripts\activate 
+.venv\Scripts\activate
 ```
 
 ## Usage
@@ -27,6 +30,13 @@ Windows:
 uv run uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
+## AI chat configuration
+
+To enable AI chat with Anthropic, set:
+
+- `ANTHROPIC_API_KEY`: your Anthropic API key
+- `ANTHROPIC_MODEL` (optional): defaults to `claude-sonnet-4-6`
+
 ## Description of the endpoints.
 
 `/telemetry`
@@ -34,6 +44,7 @@ uv run uvicorn main:app --host 0.0.0.0 --port 8000
 Receives telemetry data from Homebrew. Returns an ACK response.
 
 Expected packet format:
+
 ```
     {
         "sender_id" : Sender.HOMEBREW
@@ -48,6 +59,7 @@ Receives a brew request from Overbrew. Returns "brew accepted" or error messages
 If Overbrew requests that a profile is created, this function will populate Databrew with the new profile.
 
 Expected packet format:
+
 ```
 {
     "sender_id" : Sender.OVERBREW,
@@ -64,6 +76,7 @@ Takes the status of a brew job via a GET request.
 Input: request ID.
 
 Returns:
+
 ```
 {
     "sender_id" : Sender.AWAYBREW
@@ -72,8 +85,26 @@ Returns:
 }
 ```
 
+`/ai/chat`
+
+Authenticated endpoint used by Overbrew's AI panel. The endpoint infers brew settings from natural language and can trigger brewing when enough detail is present.
+
+Expected packet format:
+
+```
+{
+    "sender_id": Sender.OVERBREW,
+    "type": "ai_chat",
+    "session_id": "<CHAT SESSION ID>",
+    "user_id": "<FIREBASE UID>",
+    "message": "I want a strong coffee at 92C with 8 ml/s flow"
+}
+```
+
 ## Working with Awaybrew in Python (does not apply to MicroPython)
+
 ### Sending packets to Awaybrew:
+
 ```python
 from utils.packet import Packet
 from utils.sender import Sender
@@ -86,6 +117,7 @@ Packet(Sender.<SENDER_ID>, "message type", res).to_response() # Returns a FastAP
 ```
 
 ### Receiving packets from Awaybrew
+
 ```python
 from utils.packet import Packet
 from utils.sender import Sender

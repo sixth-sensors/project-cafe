@@ -91,6 +91,7 @@ const Info = () => {
           <div className="abort-container">
             <button
               className="abort-button"
+              disabled={!brewActive}
               onClick={handleAbort}
               type="button"
             >
