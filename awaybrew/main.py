@@ -444,15 +444,6 @@ async def brew(request: Request):
         quantity=float(quantity),
     )
 
-    app.state.ACTIVE_BREW = {
-        "request_id": request_id,
-        "target_temperature": float(target_temperature),
-        "flow_rate": float(flow_rate),
-        "quantity": float(quantity),
-        "started_at": datetime.now(),
-    }
-
-
 @app.post("/ai/chat")
 async def ai_chat(request: Request, token: dict = Depends(verify_token)):
     try:
