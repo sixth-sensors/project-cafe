@@ -299,18 +299,6 @@ async def receive_telemetry(request: Request):
             }
         )
 
-        if (
-            msg["temp"] is not None
-            and msg["temp"] >= app.state.ACTIVE_BREW["target_temperature"]
-        ):
-            await broadcast(
-                {
-                    "type": "brew_finished",
-                    "request_id": app.state.ACTIVE_BREW["request_id"],
-                }
-            )
-            app.state.ACTIVE_BREW = None
-
     return Packet.ack(Sender.AWAYBREW).to_response()
 
 
@@ -349,6 +337,22 @@ async def get_homebrew_brew(request: Request):
             content=json.dumps(packet.to_dict()), media_type="application/json"
         )
     return packet.to_response()
+
+
+@app.get("/homebrew/finish")
+async def finish_brew(request: Request):
+    """
+    Called by Homebrew when a brew is finished. Resets the active brew state and broadcasts the update to the frontend.
+    """
+    app.state.ACTIVE_BREW = None
+
+    await broadcast(
+        {
+            "type": "brew_finished",
+        },
+    )
+
+    return Packet.ack(Sender.AWAYBREW).to_response()
 
 
 ##################################################
@@ -443,6 +447,7 @@ async def brew(request: Request):
         flow_rate=float(flow_rate),
         quantity=float(quantity),
     )
+
 
 @app.post("/ai/chat")
 async def ai_chat(request: Request, token: dict = Depends(verify_token)):
