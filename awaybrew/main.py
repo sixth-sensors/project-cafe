@@ -1,23 +1,43 @@
-import asyncio
 import base64
 import copy
 import json
 import os
 import uuid
 from datetime import datetime
+from typing import Any
 
-import firebase_admin
-import mysql.connector
+from ai import (
+    AI_CONTEXT_LIMIT,
+    AI_MAX_FLOW_RATE,
+    AI_MAX_TEMPERATURE_C,
+    AI_MIN_FLOW_RATE,
+    AI_MIN_TEMPERATURE_C,
+    anthropic_structured_reply,
+    extract_settings_from_text,
+    normalize_ai_output,
+    clamp,
+)
+from db import (
+    create_brew_request,
+    favourite_brew_request,
+    get_user_brew_requests,
+    get_user_favourites,
+)
 from dotenv import load_dotenv
+
+import asyncio
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+import firebase_admin
 from firebase_admin import auth, credentials
 from utils.packet import Packet
 from utils.sender import Sender
 
 MAXIMUM_NUMBER_OF_BREW_REQUESTS = 10
+DEFAULT_BREW_QUANTITY_ML = 30.0
+
 
 # Load environment variables
 load_dotenv()
@@ -29,6 +49,7 @@ app.state.BREW_JOBS = {}
 app.state.SSE_QUEUES = (
     set()
 )  # List of queues for all connected SSE clients. Each client has its own queue.
+app.state.AI_CHAT_SESSIONS = {}
 
 # TODO: DELETE HARDCODED DUMMY JOB
 app.state.BREW_JOBS["dummy-job"] = {
@@ -70,163 +91,53 @@ print("Firebase Admin initialized successfully")
 
 bearer_scheme = HTTPBearer()
 
-# Initialize Databrew connection pool
-databrew_pool = mysql.connector.pooling.MySQLConnectionPool(
-    pool_name="databrew_pool",
-    pool_size=5,
-    host=os.getenv("DB_HOST"),
-    port=os.getenv("DB_PORT"),
-    user=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD"),
-    database=os.getenv("DB_NAME"),
-    ssl_disabled=False,
-)
-
-try:
-    connection = databrew_pool.get_connection()
-    cursor = connection.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS brew_requests (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id VARCHAR(64) NOT NULL,
-            title VARCHAR(255) DEFAULT 'My Brew',
-            temperature FLOAT NOT NULL,
-            flow_rate FLOAT NOT NULL,
-            quantity FLOAT NOT NULL DEFAULT 30,
-            start_timestamp TIMESTAMP NOT NULL,
-            favourite BOOLEAN DEFAULT FALSE
-        )
-    """)
-
-    # Attempt to gracefully alter the table if it already exists from a previous step
-    try:
-        cursor.execute(
-            "ALTER TABLE brew_requests ADD COLUMN title VARCHAR(255) DEFAULT 'My Brew'"
-        )
-    except mysql.connector.Error as err:
-        # Error 1060 is "Duplicate column name", meaning it already exists
-        if err.errno != 1060:
-            print(f"Non-fatal error adding title column: {err}")
-
-    try:
-        cursor.execute(
-            "ALTER TABLE brew_requests ADD COLUMN quantity FLOAT NOT NULL DEFAULT 30"
-        )
-    except mysql.connector.Error as err:
-        # Error 1060 is "Duplicate column name", meaning it already exists
-        if err.errno != 1060:
-            print(f"Non-fatal error adding quantity column: {err}")
-
-    connection.commit()
-finally:
-    if "cursor" in locals():
-        cursor.close()
-    if "connection" in locals() and connection.is_connected():
-        connection.close()
-
-print("Databrew connection initialized successfully")
-
 
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
 
 
-#####################
-# DATABREW FUNCTIONS
-#####################
-
-
-def create_brew_request(
+async def _start_brew_job(
     user_id: str,
     title: str,
-    temperature: float,
+    target_temperature: float,
     flow_rate: float,
-    quantity: float,
-    start_timestamp: datetime,
-    favourite: bool,
-):
-    connection = databrew_pool.get_connection()
-    try:
-        cursor = connection.cursor()
-        cursor.execute(
-            """
-        INSERT INTO brew_requests (user_id, title, temperature, flow_rate, quantity, start_timestamp, favourite)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """,
-            (
-                user_id,
-                title,
-                temperature,
-                flow_rate,
-                quantity,
-                start_timestamp,
-                favourite,
-            ),
-        )
-        connection.commit()
-        last_id = cursor.lastrowid
-        cursor.close()
-        return last_id
-    finally:
-        connection.close()
+    quantity: float = DEFAULT_BREW_QUANTITY_ML,
+    favourite: bool = False,
+) -> dict[str, Any]:
+    request_id = str(uuid.uuid4())
 
+    app.state.ACTIVE_BREW = {
+        "request_id": request_id,
+        "target_temperature": float(target_temperature),
+        "flow_rate": float(flow_rate),
+        "quantity": float(quantity),
+        "started_at": datetime.now(),
+    }
 
-def favourite_brew_request(brew_id: int, favourite_status: bool):
-    connection = databrew_pool.get_connection()
-    try:
-        cursor = connection.cursor()
-        cursor.execute(
-            """
-        UPDATE brew_requests SET favourite = %s WHERE id = %s
-        """,
-            (favourite_status, brew_id),
-        )
-        connection.commit()
-        cursor.close()
-    finally:
-        connection.close()
+    await broadcast(
+        {
+            "type": "brew_started",
+            "request_id": request_id,
+        },
+    )
 
+    db_id = create_brew_request(
+        user_id=user_id,
+        title=title,
+        temperature=float(target_temperature),
+        flow_rate=float(flow_rate),
+        quantity=float(quantity),
+        start_timestamp=datetime.now(),
+        favourite=favourite,
+    )
 
-def get_user_brew_requests(user_id: str, number_of_requests: int):
-    connection = databrew_pool.get_connection()
-    try:
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute(
-            """
-        SELECT id, user_id, title, temperature, flow_rate, quantity, start_timestamp, favourite
-        FROM brew_requests 
-        WHERE user_id = %s 
-        ORDER BY start_timestamp DESC 
-        LIMIT %s
-        """,
-            (user_id, number_of_requests),
-        )
-        results = cursor.fetchall()
-        cursor.close()
-        return results
-    finally:
-        connection.close()
-
-
-def get_user_favourites(user_id: str):
-    connection = databrew_pool.get_connection()
-    try:
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute(
-            """
-        SELECT id, user_id, title, temperature, flow_rate, quantity, start_timestamp, favourite
-        FROM brew_requests 
-        WHERE user_id = %s AND favourite = TRUE
-        ORDER BY start_timestamp DESC
-        """,
-            (user_id,),
-        )
-        results = cursor.fetchall()
-        cursor.close()
-        return results
-    finally:
-        connection.close()
+    return {
+        "sender_id": Sender.AWAYBREW,
+        "type": "brew_started",
+        "request_id": request_id,
+        "id": db_id,
+    }
 
 
 #####################
@@ -487,7 +398,7 @@ async def brew(request: Request):
     flow_rate = msg.get("flow_rate")
     quantity = msg.get("quantity")
 
-    if sender_id != Sender.OVERBREW or msg_type != "brew":
+    if sender_id not in (Sender.OVERBREW, Sender.AUTOBREW) or msg_type != "brew":
         return Response(
             content='{"type":"error","error":"invalid_message"}',
             media_type="application/json",
@@ -525,40 +436,220 @@ async def brew(request: Request):
 
     commands = []  # List of commands that will be taken by the brew.
     print(commands)
-    request_id = str(uuid.uuid4())
+    return await _start_brew_job(
+        user_id=str(user_id),
+        title=str(title),
+        target_temperature=float(target_temperature),
+        flow_rate=float(flow_rate),
+        quantity=float(quantity),
+    )
 
-    app.state.ACTIVE_BREW = {
-        "request_id": request_id,
-        "target_temperature": float(target_temperature),
-        "flow_rate": float(flow_rate),
-        "quantity": float(quantity),
-        "started_at": datetime.now(),
-    }
+@app.post("/ai/chat")
+async def ai_chat(request: Request, token: dict = Depends(verify_token)):
+    try:
+        msg = await request.json()
+    except Exception:
+        return Response(
+            content='{"error":"invalid_json"}',
+            media_type="application/json",
+            status_code=400,
+        )
 
-    # SSE: let the user know the brew started immediately
-    await broadcast(
+    if not isinstance(msg, dict):
+        return Response(
+            content='{"type":"error","error":"invalid_message"}',
+            media_type="application/json",
+            status_code=400,
+        )
+
+    sender_id = msg.get("sender_id")
+    msg_type = msg.get("type")
+    user_id = msg.get("user_id")
+    session_id = msg.get("session_id") or user_id
+    user_message = msg.get("message", "")
+
+    if sender_id != Sender.OVERBREW or msg_type != "ai_chat":
+        return Response(
+            content='{"type":"error","error":"invalid_message"}',
+            media_type="application/json",
+            status_code=400,
+        )
+
+    if not isinstance(session_id, str) or not session_id.strip():
+        return Response(
+            content='{"type":"error","error":"invalid_session"}',
+            media_type="application/json",
+            status_code=400,
+        )
+
+    if not isinstance(user_id, str) or not user_id.strip():
+        return Response(
+            content='{"type":"error","error":"invalid_user"}',
+            media_type="application/json",
+            status_code=400,
+        )
+
+    token_uid = token.get("uid")
+    if token_uid != user_id:
+        return Response(
+            content='{"type":"error","error":"forbidden_user"}',
+            media_type="application/json",
+            status_code=403,
+        )
+
+    if not isinstance(user_message, str) or not user_message.strip():
+        return Response(
+            content='{"type":"error","error":"invalid_prompt"}',
+            media_type="application/json",
+            status_code=400,
+        )
+
+    chat_state = app.state.AI_CHAT_SESSIONS.setdefault(
+        session_id,
         {
-            "type": "brew_started",
-            "request_id": request_id,
+            "temperature_c": None,
+            "flow_rate": None,
+            "quantity_ml": None,
+            "messages": [],
         },
     )
 
-    db_id = create_brew_request(
-        user_id=user_id,
-        title=title,
-        temperature=float(target_temperature),
-        flow_rate=float(flow_rate),
-        quantity=float(quantity),
-        start_timestamp=datetime.now(),
-        favourite=False,
+    history: list[dict[str, str]] = chat_state.get("messages", [])
+    history.append({"role": "user", "content": user_message.strip()})
+    history = history[-AI_CONTEXT_LIMIT:]
+
+    recent_brews = get_user_brew_requests(user_id=user_id, number_of_requests=5)
+    favourite_brews = get_user_favourites(user_id=user_id)
+
+    def format_brew(b: dict) -> str:
+        return f"- {b.get('title', 'Unknown')} (Temp: {b.get('temperature')}°C, Flow: {b.get('flow_rate')} ml/s, Qty: {b.get('quantity')} ml)"
+
+    context_lines = []
+    if recent_brews:
+        context_lines.append(
+            "### User's Recent Brews:\n"
+            + "\n".join(format_brew(b) for b in recent_brews)
+        )
+    if favourite_brews:
+        context_lines.append(
+            "### User's Favourite Brews:\n"
+            + "\n".join(format_brew(b) for b in favourite_brews)
+        )
+
+    if context_lines:
+        context_lines.insert(
+            0,
+            "## User Brew Database Context\nYou have access to the following historical brew data for this user:\n",
+        )
+
+    additional_context = "\n\n".join(context_lines)
+
+    llm_output = await anthropic_structured_reply(
+        history, additional_context=additional_context
+    )
+    normalized = normalize_ai_output(llm_output)
+
+    fallback = extract_settings_from_text(user_message)
+
+    resolved_temperature = normalized.get("temperature_c")
+    resolved_flow_rate = normalized.get("flow_rate")
+    resolved_quantity = normalized.get("quantity_ml")
+
+    if resolved_temperature is None:
+        resolved_temperature = fallback.get("temperature_c")
+    if resolved_flow_rate is None:
+        resolved_flow_rate = fallback.get("flow_rate")
+    if resolved_quantity is None:
+        resolved_quantity = fallback.get("quantity_ml")
+
+    if resolved_temperature is not None:
+        resolved_temperature = clamp(
+            resolved_temperature, AI_MIN_TEMPERATURE_C, AI_MAX_TEMPERATURE_C
+        )
+        chat_state["temperature_c"] = resolved_temperature
+
+    if resolved_flow_rate is not None:
+        resolved_flow_rate = clamp(
+            resolved_flow_rate, AI_MIN_FLOW_RATE, AI_MAX_FLOW_RATE
+        )
+        chat_state["flow_rate"] = resolved_flow_rate
+
+    if resolved_quantity is not None:
+        resolved_quantity = clamp(resolved_quantity, 30.0, 500.0)
+        chat_state["quantity_ml"] = resolved_quantity
+
+    normalized["temperature_c"] = chat_state.get("temperature_c")
+    normalized["flow_rate"] = chat_state.get("flow_rate")
+    normalized["quantity_ml"] = chat_state.get("quantity_ml")
+
+    missing_fields: list[str] = []
+    if normalized["temperature_c"] is None:
+        missing_fields.append("temperature")
+    if normalized["flow_rate"] is None:
+        missing_fields.append("flow_rate")
+    if normalized["quantity_ml"] is None:
+        missing_fields.append("quantity")
+
+    normalized["missing_fields"] = missing_fields
+    normalized["needs_more_info"] = len(missing_fields) > 0
+    normalized["brew_now"] = (
+        bool(normalized.get("brew_now")) and not normalized["needs_more_info"]
     )
 
-    return {
+    assistant_message = str(normalized["assistant_message"])
+    history.append({"role": "assistant", "content": assistant_message})
+    chat_state["messages"] = history[-AI_CONTEXT_LIMIT:]
+
+    response: dict[str, Any] = {
         "sender_id": Sender.AWAYBREW,
-        "type": "brew_started",
-        "request_id": request_id,
-        "id": db_id,
+        "type": "ai_chat",
+        "assistant_message": assistant_message,
+        "inferred": {
+            "temperature": normalized["temperature_c"],
+            "flow_rate": normalized["flow_rate"],
+            "quantity": normalized["quantity_ml"],
+        },
+        "missing_fields": normalized["missing_fields"],
+        "needs_more_info": normalized["needs_more_info"],
+        "ready_to_brew": not normalized["needs_more_info"],
+        "brew_started": False,
     }
+
+    if normalized["brew_now"]:
+        brew_title = normalized.get("brew_title") or "AI Brew"
+        is_favourite = bool(normalized.get("save_as_favourite"))
+
+        brew_result = await _start_brew_job(
+            user_id=user_id,
+            title=brew_title,
+            target_temperature=float(normalized["temperature_c"]),
+            flow_rate=float(normalized["flow_rate"]),
+            quantity=float(normalized["quantity_ml"]),
+            favourite=is_favourite,
+        )
+        response["brew_started"] = True
+        response["brew_saved"] = is_favourite
+        response["brew_title"] = brew_title
+        response["request_id"] = brew_result["request_id"]
+        response["id"] = brew_result["id"]
+    elif (
+        bool(normalized.get("save_as_favourite")) and not normalized["needs_more_info"]
+    ):
+        brew_title = normalized.get("brew_title") or "Saved AI Brew"
+        db_id = create_brew_request(
+            user_id=user_id,
+            title=brew_title,
+            temperature=float(normalized["temperature_c"]),
+            flow_rate=float(normalized["flow_rate"]),
+            quantity=float(normalized["quantity_ml"]),
+            start_timestamp=datetime.now(),
+            favourite=True,
+        )
+        response["brew_saved"] = True
+        response["brew_title"] = brew_title
+        response["id"] = db_id
+
+    return response
 
 
 @app.put("/favourite_brew")
