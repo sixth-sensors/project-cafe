@@ -92,6 +92,7 @@ try:
             title VARCHAR(255) DEFAULT 'My Brew',
             temperature FLOAT NOT NULL,
             flow_rate FLOAT NOT NULL,
+            quantity FLOAT NOT NULL DEFAULT 30,
             start_timestamp TIMESTAMP NOT NULL,
             favourite BOOLEAN DEFAULT FALSE
         )
@@ -106,6 +107,15 @@ try:
         # Error 1060 is "Duplicate column name", meaning it already exists
         if err.errno != 1060:
             print(f"Non-fatal error adding title column: {err}")
+
+    try:
+        cursor.execute(
+            "ALTER TABLE brew_requests ADD COLUMN quantity FLOAT NOT NULL DEFAULT 30"
+        )
+    except mysql.connector.Error as err:
+        # Error 1060 is "Duplicate column name", meaning it already exists
+        if err.errno != 1060:
+            print(f"Non-fatal error adding quantity column: {err}")
 
     connection.commit()
 finally:
@@ -132,18 +142,27 @@ def create_brew_request(
     title: str,
     temperature: float,
     flow_rate: float,
+    quantity: float,
     start_timestamp: datetime,
     favourite: bool,
 ):
     connection = databrew_pool.get_connection()
     try:
-        cursor = ConnectionAbortedError.cursor()
+        cursor = connection.cursor()
         cursor.execute(
             """
-        INSERT INTO brew_requests (user_id, title, temperature, flow_rate, start_timestamp, favourite) 
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO brew_requests (user_id, title, temperature, flow_rate, quantity, start_timestamp, favourite)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         """,
-            (user_id, title, temperature, flow_rate, start_timestamp, favourite),
+            (
+                user_id,
+                title,
+                temperature,
+                flow_rate,
+                quantity,
+                start_timestamp,
+                favourite,
+            ),
         )
         connection.commit()
         last_id = cursor.lastrowid
@@ -175,7 +194,7 @@ def get_user_brew_requests(user_id: str, number_of_requests: int):
         cursor = connection.cursor(dictionary=True)
         cursor.execute(
             """
-        SELECT id, user_id, title, temperature, flow_rate, start_timestamp, favourite 
+        SELECT id, user_id, title, temperature, flow_rate, quantity, start_timestamp, favourite
         FROM brew_requests 
         WHERE user_id = %s 
         ORDER BY start_timestamp DESC 
@@ -196,7 +215,7 @@ def get_user_favourites(user_id: str):
         cursor = connection.cursor(dictionary=True)
         cursor.execute(
             """
-        SELECT id, user_id, title, temperature, flow_rate, start_timestamp, favourite 
+        SELECT id, user_id, title, temperature, flow_rate, quantity, start_timestamp, favourite
         FROM brew_requests 
         WHERE user_id = %s AND favourite = TRUE
         ORDER BY start_timestamp DESC
@@ -396,6 +415,8 @@ async def get_homebrew_brew(request: Request):
     if app.state.ACTIVE_BREW is not None:
         payload = {
             "target_temperature": app.state.ACTIVE_BREW["target_temperature"],
+            "flow_rate": app.state.ACTIVE_BREW["flow_rate"],
+            "quantity": app.state.ACTIVE_BREW["quantity"],
         }
         if "started_at" in app.state.ACTIVE_BREW:
             payload["started_at"] = app.state.ACTIVE_BREW["started_at"].isoformat()
@@ -439,6 +460,7 @@ async def brew(request: Request):
 
         "temperature" : <TARGET TEMPERATURE>
         "flow_rate" : <TARGET FLOW RATE>
+        "quantity" : <TOTAL QUANTITY IN ML>
     }
     """
 
@@ -463,6 +485,7 @@ async def brew(request: Request):
 
     target_temperature = msg.get("temperature")
     flow_rate = msg.get("flow_rate")
+    quantity = msg.get("quantity")
 
     if sender_id != Sender.OVERBREW or msg_type != "brew":
         return Response(
@@ -474,6 +497,7 @@ async def brew(request: Request):
     if (
         not isinstance(target_temperature, (float, int))
         or not isinstance(flow_rate, (float, int))
+        or not isinstance(quantity, (float, int))
         or not sender_id
         or not msg_type
         or not user_id
@@ -507,6 +531,7 @@ async def brew(request: Request):
         "request_id": request_id,
         "target_temperature": float(target_temperature),
         "flow_rate": float(flow_rate),
+        "quantity": float(quantity),
         "started_at": datetime.now(),
     }
 
@@ -523,6 +548,7 @@ async def brew(request: Request):
         title=title,
         temperature=float(target_temperature),
         flow_rate=float(flow_rate),
+        quantity=float(quantity),
         start_timestamp=datetime.now(),
         favourite=False,
     )

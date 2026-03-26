@@ -37,7 +37,7 @@ const BrewButton = ({
         >
           <div className="brew-button-content">
             <h2>{title}</h2>
-            <p>{`${settings.temperature}°C - ${settings.flowRate.toFixed(1)}ml/s`}</p>
+            <p>{`${settings.temperature}°C - ${settings.flowRate.toFixed(1)}ml/s - ${settings.quantity}ml`}</p>
             <p className="brew-button-timestamp">{formattedTimestamp}</p>
           </div>
         </button>
