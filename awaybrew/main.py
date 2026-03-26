@@ -338,6 +338,7 @@ async def get_homebrew_brew(request: Request):
         )
     return packet.to_response()
 
+
 @app.get("/homebrew/finish")
 async def finish_brew(request: Request):
     """
@@ -352,6 +353,7 @@ async def finish_brew(request: Request):
     )
 
     return Packet.ack(Sender.AWAYBREW).to_response()
+
 
 ##################################################
 # OVERBREW ENDPOINTS
@@ -445,6 +447,7 @@ async def brew(request: Request):
         flow_rate=float(flow_rate),
         quantity=float(quantity),
     )
+
 
 @app.post("/ai/chat")
 async def ai_chat(request: Request, token: dict = Depends(verify_token)):
@@ -745,6 +748,7 @@ async def fetch_favourites(user_id: str):
         "type": "fetched favourites",
         "favourites": favourites,
     }
+
 
 @app.post("/abort")
 async def abort_brew(request: Request):
