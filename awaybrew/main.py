@@ -101,6 +101,7 @@ async def _start_brew_job(
     target_temperature: float,
     flow_rate: float,
     quantity: float = DEFAULT_BREW_QUANTITY_ML,
+    favourite: bool = False,
 ) -> dict[str, Any]:
     request_id = str(uuid.uuid4())
 
@@ -126,7 +127,7 @@ async def _start_brew_job(
         flow_rate=float(flow_rate),
         quantity=float(quantity),
         start_timestamp=datetime.now(),
-        favourite=False,
+        favourite=favourite,
     )
 
     return {
@@ -515,7 +516,24 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
     history.append({"role": "user", "content": user_message.strip()})
     history = history[-AI_CONTEXT_LIMIT:]
 
-    llm_output = await anthropic_structured_reply(history)
+    recent_brews = get_user_brew_requests(user_id=user_id, number_of_requests=5)
+    favourite_brews = get_user_favourites(user_id=user_id)
+
+    def format_brew(b: dict) -> str:
+        return f"- {b.get('title', 'Unknown')} (Temp: {b.get('temperature')}°C, Flow: {b.get('flow_rate')} ml/s)"
+
+    context_lines = []
+    if recent_brews:
+        context_lines.append("### User's Recent Brews:\n" + "\n".join(format_brew(b) for b in recent_brews))
+    if favourite_brews:
+        context_lines.append("### User's Favourite Brews:\n" + "\n".join(format_brew(b) for b in favourite_brews))
+
+    if context_lines:
+        context_lines.insert(0, "## User Brew Database Context\nYou have access to the following historical brew data for this user:\n")
+    
+    additional_context = "\n\n".join(context_lines)
+
+    llm_output = await anthropic_structured_reply(history, additional_context=additional_context)
     normalized = normalize_ai_output(llm_output)
 
     fallback = extract_settings_from_text(user_message)
@@ -573,16 +591,36 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
     }
 
     if normalized["brew_now"]:
+        brew_title = normalized.get("brew_title") or "AI Brew"
+        is_favourite = bool(normalized.get("save_as_favourite"))
+        
         brew_result = await _start_brew_job(
             user_id=user_id,
-            title="AI Brew",
+            title=brew_title,
             target_temperature=float(normalized["temperature_c"]),
             flow_rate=float(normalized["flow_rate"]),
             quantity=DEFAULT_BREW_QUANTITY_ML,
+            favourite=is_favourite,
         )
         response["brew_started"] = True
+        response["brew_saved"] = is_favourite
+        response["brew_title"] = brew_title
         response["request_id"] = brew_result["request_id"]
         response["id"] = brew_result["id"]
+    elif bool(normalized.get("save_as_favourite")) and not normalized["needs_more_info"]:
+        brew_title = normalized.get("brew_title") or "Saved AI Brew"
+        db_id = create_brew_request(
+            user_id=user_id,
+            title=brew_title,
+            temperature=float(normalized["temperature_c"]),
+            flow_rate=float(normalized["flow_rate"]),
+            quantity=DEFAULT_BREW_QUANTITY_ML,
+            start_timestamp=datetime.now(),
+            favourite=True,
+        )
+        response["brew_saved"] = True
+        response["brew_title"] = brew_title
+        response["id"] = db_id
 
     return response
 

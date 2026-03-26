@@ -39,6 +39,8 @@ type AiChatResponse = {
   }
   ready_to_brew?: boolean
   brew_started?: boolean
+  brew_saved?: boolean
+  brew_title?: string
   request_id?: string
   id?: number
 }
@@ -286,19 +288,24 @@ const Brew = () => {
         setFlowRate(inferredFlowRate)
       }
 
-      if (response.brew_started && response.id) {
+      if ((response.brew_started || response.brew_saved) && response.id) {
         const newBrew: Brew = {
           id: String(response.id),
-          title: brewName || 'AI Brew',
+          title:
+            response.brew_title ||
+            brewName ||
+            (response.brew_saved ? 'Saved AI Brew' : 'AI Brew'),
           settings: {
             temperature: inferredTemperature,
             flowRate: inferredFlowRate,
           },
-          isFavorite: false,
+          isFavorite: !!response.brew_saved,
           timestamp: new Date().toISOString(),
         }
         setBrews((currentBrews) => [newBrew, ...currentBrews])
-        window.location.hash = '#info'
+        if (response.brew_started) {
+          window.location.hash = '#info'
+        }
       }
     } catch (error) {
       console.error('AI chat failed:', error)
