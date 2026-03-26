@@ -37,7 +37,7 @@ class Homebrew:
     PLUGBREW_MAC = "14:08:08:69:4F:FF"
 
     BREW_MSG_REQUIRED_KEYS = {"sender_id", "type", "target_temperature"}
-    BREW_MSG_OPTIONAL_KEYS = {"flow_rate", "quantity"}
+    BREW_MSG_OPTIONAL_KEYS = {"flow_rate", "quantity", "started_at"}
     BREW_MSG_SCHEMA = {
         "sender_id": Sender.AWAYBREW,
         "type": "brew",
@@ -56,7 +56,7 @@ class Homebrew:
     ACCEPTABLE_MIN_TEMPERATURE_DEGREES_CELSIUS = 0.0  # temporary value
     ACCEPTABLE_MAX_TEMPERATURE_DEGREES_CELSIUS = 100.0  # temporary value
     ACCEPTABLE_TEMPERATURE_MARGIN_DEGREES_CELSIUS = 1.0
-    TEMP_SENSOR_PIN_NUMBER = 4
+    TEMP_SENSOR_PIN_NUMBER = 20
     PUMP_PIN_NUMBER = 3
     PUMP_DUTY_ALL_OFF = 0
     PUMP_DUTY_ALL_ON = 1023
@@ -103,6 +103,19 @@ class Homebrew:
                     pass
 
         return None
+
+    def _is_plugbrew_online(self):
+        if not self.plugbrew_ip_address:
+            return False
+        try:
+            r = urequests.get(
+                f"http://{self.plugbrew_ip_address}/switch/Plugbrew", timeout=2
+            )
+            online = r.status_code == 200
+            r.close()
+            return online
+        except OSError:
+            return False
 
     def _set_led_colour(self, colour):
         led = NeoPixel(machine.Pin(8), 1)
@@ -175,6 +188,14 @@ class Homebrew:
             headers={"Content-Type": "application/msgpack"},
         )
         print(f"Sent: {msg}, Response: {req.status_code}")
+        req.close()
+
+    def _send_finished_msg(self):
+        url = f"https://{self.AWAYBREW_HOST}/finished"
+        req = urequests.get(
+            url,
+        )
+        print(f"Sent (done) Response: {req.status_code}")
         req.close()
 
     def _poll_brew(self):
@@ -266,7 +287,7 @@ class Homebrew:
                     return False
                 if (
                     brew_msg["quantity"] < 0
-                    or brew_msg["quantity"] > self.MAX_COFFEE_POT_ML
+                    or brew_msg["quantity"] > self.MAX_BREW_BASKET_ML
                 ):
                     print("Quantity out of range")
                     return False
@@ -366,6 +387,7 @@ class Homebrew:
             self.brew_flow_rate = flow_rate
             self.brew_quantity = quantity
             self.volume_transferred = 0.0
+            print("Entering HEATING phase")
             self.brew_phase = BrewPhase.HEATING
             print(f"Brew started: {quantity}ml at {flow_rate}ml/s")
 
@@ -374,12 +396,13 @@ class Homebrew:
             return
 
         if self.brew_phase == BrewPhase.HEATING:
-            if current_temp is not None and current_temp >= self.target_temperature:
+            if current_temp is not None and current_temp >= self.target_temperature - 2:
                 pump_percent = (
                     self.brew_flow_rate / self.MAX_KETTLE_TO_BASKET_FLOW_RATE_ML_PER_SEC
                 ) * 100
                 self._set_pump_percent(pump_percent)
                 self.last_pump_ticks = time.ticks_ms()
+                print("Entering PUMPING phase")
                 self.brew_phase = BrewPhase.PUMPING
                 print(f"Target temp reached, pumping at {pump_percent:.1f}%")
 
@@ -392,10 +415,15 @@ class Homebrew:
 
             if self.volume_transferred >= self.brew_quantity:
                 self._set_pump_percent(0)
+                print("Entering COMPLETE phase")
                 self.brew_phase = BrewPhase.COMPLETE
+                self._send_finished_msg()
                 print(f"Brew complete: {self.volume_transferred:.1f}ml transferred")
 
     def _control_temperature(self, current_temp):
+        if self.brew_phase != BrewPhase.HEATING:
+            return
+
         if self.target_temperature is None or current_temp is None:
             return
 
@@ -471,18 +499,29 @@ class Homebrew:
         self.temp_sensor.convert_temp()
 
         for result in self.temp_results:
-            temp = self.temp_sensor.read_temp(result)
-            if temp is not None:
-                self.last_valid_temp = temp
+            try:
+                temp = self.temp_sensor.read_temp(result)
+                if temp is not None:
+                    self.last_valid_temp = temp
+            except Exception as e:
+                print(f"Temperature read error: {e}")
 
         return self.last_valid_temp
 
     def run(self):
+        self._set_pump_percent(0)
+
         print("--- HOMEBREW ---")
 
         self._setup_connectivity()
+
+        while (
+            not self._is_plugbrew_online()
+            and self._get_current_temperature() is not None
+        ):
+            time.sleep(1)
+
         self._set_plug_enabled(False)
-        self._set_pump_percent(0)
 
         # Main loop
         while True:
