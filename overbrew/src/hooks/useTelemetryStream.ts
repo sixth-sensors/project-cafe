@@ -10,6 +10,7 @@ export interface TelemetryEvent {
   temp: number
   target_temp: number
   timestamp: number
+  flow_rate?: number
   brew_status?: boolean
 }
 

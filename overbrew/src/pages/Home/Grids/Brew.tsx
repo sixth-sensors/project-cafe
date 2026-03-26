@@ -8,6 +8,15 @@ import BrewButton, {
 } from '../../../components/BrewButton/BrewButton'
 import Slider from '../../../components/Slider/Slider'
 import { FaPlay, FaSignal, FaWifi } from 'react-icons/fa'
+import {
+  MIN_FLOW_RATE,
+  MAX_FLOW_RATE,
+  MAX_TEMP,
+  MIN_TEMP,
+  MIN_QUANTITY,
+  MAX_QUANTITY,
+} from '../../../constants/brew'
+import joe from '/joe.png'
 
 export type BrewSettings = {
   temperature: number
@@ -49,9 +58,9 @@ type AiChatResponse = {
 const Brew = () => {
   const { user } = useAuth()
   const { brewActive } = useBrew()
-  const [temperature, setTemperature] = useState(60)
-  const [flowRate, setFlowRate] = useState(1)
-  const [quantity, setQuantity] = useState(30)
+  const [temperature, setTemperature] = useState(MIN_TEMP)
+  const [flowRate, setFlowRate] = useState(MIN_FLOW_RATE)
+  const [quantity, setQuantity] = useState(MIN_QUANTITY)
   const [brewName, setBrewName] = useState('')
   const [brews, setBrews] = useState<Brew[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -431,7 +440,9 @@ const Brew = () => {
                     Chat
                   </button>
                 </div>
-                <div />
+                {activeSettingsPanel === 'chat' ? (
+                  <img alt="Joe" className="settings-header-joe" src={joe} />
+                ) : null}
               </div>
 
               {activeSettingsPanel === 'settings' ? (
@@ -440,8 +451,8 @@ const Brew = () => {
                     gradientMax="#F23232"
                     gradientMin="#BFFAFF"
                     label="Temperature (°C)"
-                    max={96}
-                    min={60}
+                    max={MAX_TEMP}
+                    min={MIN_TEMP}
                     onChange={setTemperature}
                     value={temperature}
                   />
@@ -449,27 +460,28 @@ const Brew = () => {
                     gradientMax="var(--dark-brown)"
                     gradientMin="var(--lighter-brown)"
                     label="Flow Rate (ml/s)"
-                    max={20}
-                    min={1}
+                    max={MAX_FLOW_RATE}
+                    min={MIN_FLOW_RATE}
                     onChange={setFlowRate}
+                    step={0.1}
                     value={flowRate}
                   />
                   <Slider
-                    gradientMax="#000f93"
+                    gradientMax="#0d1666"
                     gradientMin="#BFFAFF"
                     label="Quantity (ml)"
-                    max={1000}
-                    min={30}
+                    max={MAX_QUANTITY}
+                    min={MIN_QUANTITY}
                     onChange={setQuantity}
-                    step={1}
+                    step={5}
                     value={quantity}
                   />
                 </div>
               ) : (
                 <div className="ai-chat-panel">
                   <div className="ai-chat-hint">
-                    Current settings: {temperature}°C at {flowRate.toFixed(1)}{' '}
-                    ml/s
+                    Current settings: {quantity}ml at {temperature}°C and{' '}
+                    {flowRate.toFixed(1)} ml/s
                   </div>
                   <div className="ai-chat-messages">
                     {chatMessages.map((message) => (
@@ -477,7 +489,18 @@ const Brew = () => {
                         className={`ai-chat-bubble ${message.role}`}
                         key={message.id}
                       >
-                        {message.text}
+                        {message.role === 'assistant' ? (
+                          <>
+                            <img
+                              alt="Joe"
+                              className="ai-chat-avatar"
+                              src={joe}
+                            />
+                            <span>{message.text}</span>
+                          </>
+                        ) : (
+                          message.text
+                        )}
                       </div>
                     ))}
                   </div>

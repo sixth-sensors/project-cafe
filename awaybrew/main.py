@@ -14,6 +14,9 @@ from ai import (
     AI_MIN_TEMPERATURE_C,
     anthropic_structured_reply,
     extract_settings_from_text,
+    is_cancellation_intent,
+    is_confirmation_intent,
+    is_explicit_start_intent,
     normalize_ai_output,
     clamp,
 )
@@ -199,6 +202,7 @@ async def mock_brew(token: dict = Depends(verify_token)):
                 yield {
                     "temp": round(current_temp, 1),
                     "target_temp": target_temp,
+                    "flow_rate": 0,
                     "timestamp": int(datetime.now().timestamp() * 1000),
                 }
                 await asyncio.sleep(interval_s)
@@ -293,8 +297,9 @@ async def receive_telemetry(request: Request):
             {
                 "type": "telemetry",
                 "request_id": app.state.ACTIVE_BREW["request_id"],
-                "temp": msg["temp"],
+                "temp": msg.get("temp", 0),
                 "target_temp": app.state.ACTIVE_BREW["target_temperature"],
+                "flow_rate": msg.get("flow_rate", 0),
                 "timestamp": int(datetime.now().timestamp() * 1000),
             }
         )
@@ -515,6 +520,7 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
             "temperature_c": None,
             "flow_rate": None,
             "quantity_ml": None,
+            "awaiting_confirmation": False,
             "messages": [],
         },
     )
@@ -597,9 +603,38 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
 
     normalized["missing_fields"] = missing_fields
     normalized["needs_more_info"] = len(missing_fields) > 0
-    normalized["brew_now"] = (
-        bool(normalized.get("brew_now")) and not normalized["needs_more_info"]
-    )
+
+    explicit_start = is_explicit_start_intent(user_message)
+    confirmation_reply = is_confirmation_intent(user_message)
+    cancellation_reply = is_cancellation_intent(user_message)
+    awaiting_confirmation = bool(chat_state.get("awaiting_confirmation"))
+
+    normalized["brew_now"] = False
+    if normalized["needs_more_info"]:
+        chat_state["awaiting_confirmation"] = False
+    else:
+        if cancellation_reply:
+            chat_state["awaiting_confirmation"] = False
+            normalized["brew_now"] = False
+            normalized["assistant_message"] = (
+                "Okay, I will not start brewing. Tell me any setting changes when you're ready."
+            )
+        elif explicit_start:
+            chat_state["awaiting_confirmation"] = False
+            normalized["brew_now"] = True
+        elif awaiting_confirmation and confirmation_reply:
+            chat_state["awaiting_confirmation"] = False
+            normalized["brew_now"] = True
+        else:
+            chat_state["awaiting_confirmation"] = True
+            normalized["brew_now"] = False
+            normalized["assistant_message"] = (
+                "I have your settings ready: "
+                f"{float(normalized['temperature_c']):.0f}°C, "
+                f"{float(normalized['flow_rate']):.1f} ml/s, "
+                f"{float(normalized['quantity_ml']):.0f} ml. "
+                "Reply 'confirm' to start brewing."
+            )
 
     assistant_message = str(normalized["assistant_message"])
     history.append({"role": "assistant", "content": assistant_message})

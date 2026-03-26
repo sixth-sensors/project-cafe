@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react'
-import { TARGET_TEMPERATURE } from '../../../constants/temperature'
+import { useEffect, useRef, useState } from 'react'
 import LineChart from '../../../components/LineChart/LineChart'
 import ProgressBar from '../../../components/ProgressBar/ProgressBar'
 import FlowRateDropper from '../../../components/FlowRateDropper/FlowRateDropper'
@@ -7,7 +6,7 @@ import WaterLevel from '../../../components/WaterLevel/WaterLevel'
 import './Grids.css'
 import { useAuth } from '../../../hooks/useAuth'
 import { useBrew } from '../../../hooks/useBrew'
-import { apiFetch, SENDER_ID } from '../../../lib/api'
+import { apiFetch, BASE_URL, SENDER_ID } from '../../../lib/api'
 
 import { FaTimes } from 'react-icons/fa'
 
@@ -18,12 +17,36 @@ interface TemperatureData {
   target_temp?: number
 }
 
+const TANK_CAPACITY_ML = 1700
+const DEFAULT_BREW_QUANTITY_ML = 350
+const FINISHED_PROGRESS_HOLD_MS = 1200
+
 const Info = () => {
   const { user } = useAuth()
   const { latest, brewActive, brewStartTime } = useBrew()
   const [temperatureData, setTemperatureData] = useState<TemperatureData[]>([])
-  const [progress, setProgress] = useState(0.0)
   const [flowRate, setFlowRate] = useState(0.0)
+  const [brewQuantityMl, setBrewQuantityMl] = useState(DEFAULT_BREW_QUANTITY_ML)
+  const [pumpedVolumeMl, setPumpedVolumeMl] = useState(0)
+  const [startTemperature, setStartTemperature] = useState<number | null>(null)
+  const [targetTemperature, setTargetTemperature] = useState<number | null>(
+    null
+  )
+  const [latestTemperature, setLatestTemperature] = useState<number | null>(
+    null
+  )
+  const [lastTelemetryTimestamp, setLastTelemetryTimestamp] = useState<
+    number | null
+  >(null)
+  const [showCompletedProgress, setShowCompletedProgress] = useState(false)
+  const finishedProgressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  )
+  const waterRemainingMl = Math.max(0, TANK_CAPACITY_ML - pumpedVolumeMl)
+  const waterLevel = Math.max(
+    0,
+    Math.min(100, (waterRemainingMl / TANK_CAPACITY_ML) * 100)
+  )
 
   const handleAbort = async () => {
     if (!user || !confirm('Are you sure you want to abort the current brew?'))
@@ -40,43 +63,179 @@ const Info = () => {
   }
 
   useEffect(() => {
-    switch (latest?.type) {
-      case 'brew_finished':
-      case 'brew_aborted':
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setProgress(0)
+    const updateTimer = setTimeout(() => {
+      switch (latest?.type) {
+        case 'brew_started':
+          if (finishedProgressTimerRef.current) {
+            clearTimeout(finishedProgressTimerRef.current)
+            finishedProgressTimerRef.current = null
+          }
+          setShowCompletedProgress(false)
+          setFlowRate(0.0)
+          setPumpedVolumeMl(0)
+          setStartTemperature(null)
+          setTargetTemperature(null)
+          setLatestTemperature(null)
+          setLastTelemetryTimestamp(null)
+          setTemperatureData([])
+          break
+        case 'brew_finished':
+          if (finishedProgressTimerRef.current) {
+            clearTimeout(finishedProgressTimerRef.current)
+          }
+          setShowCompletedProgress(true)
+          finishedProgressTimerRef.current = setTimeout(() => {
+            setShowCompletedProgress(false)
+          }, FINISHED_PROGRESS_HOLD_MS)
+          setFlowRate(0.0)
+          setLastTelemetryTimestamp(null)
+          setTemperatureData([])
+          break
+        case 'brew_aborted':
+          if (finishedProgressTimerRef.current) {
+            clearTimeout(finishedProgressTimerRef.current)
+            finishedProgressTimerRef.current = null
+          }
+          setShowCompletedProgress(false)
+          setFlowRate(0.0)
+          setLastTelemetryTimestamp(null)
+          setTemperatureData([])
+          break
+        case 'telemetry': {
+          setFlowRate(latest.flow_rate ?? 0.0)
+          setLatestTemperature(latest.temp)
+          if (startTemperature === null) {
+            setStartTemperature(latest.temp)
+          }
+          if (
+            typeof latest.target_temp === 'number' &&
+            targetTemperature === null
+          ) {
+            setTargetTemperature(latest.target_temp)
+          }
 
-        setFlowRate(0.0)
+          const currentTimestamp = latest.timestamp
+          if (
+            typeof latest.flow_rate === 'number' &&
+            latest.flow_rate > 0 &&
+            typeof currentTimestamp === 'number' &&
+            lastTelemetryTimestamp !== null &&
+            currentTimestamp > lastTelemetryTimestamp
+          ) {
+            const deltaSeconds =
+              (currentTimestamp - lastTelemetryTimestamp) / 1000
+            const pumpedDelta = latest.flow_rate * deltaSeconds
+            setPumpedVolumeMl((prev) => {
+              const maxPumpable = Math.max(0, brewQuantityMl)
+              return Math.min(maxPumpable, prev + pumpedDelta)
+            })
+          }
 
-        setTemperatureData([])
-        break
-      case 'telemetry':
-        setTemperatureData((prev) => [
-          ...prev,
-          {
-            temperature: latest.temp,
-            time: new Date(latest.timestamp).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-            }),
-            timestamp: latest.timestamp,
-            target_temp: latest.target_temp,
-          },
-        ])
+          if (typeof currentTimestamp === 'number') {
+            setLastTelemetryTimestamp(currentTimestamp)
+          }
+
+          setTemperatureData((prev) => [
+            ...prev,
+            {
+              temperature: latest.temp,
+              time: new Date(latest.timestamp).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              }),
+              timestamp: latest.timestamp,
+              target_temp: latest.target_temp,
+            },
+          ])
+          break
+        }
+      }
+    }, 0)
+
+    return () => clearTimeout(updateTimer)
+  }, [
+    brewQuantityMl,
+    lastTelemetryTimestamp,
+    latest,
+    startTemperature,
+    targetTemperature,
+  ])
+
+  const progress = (() => {
+    if (showCompletedProgress) return 1
+
+    if (
+      !brewActive ||
+      startTemperature === null ||
+      targetTemperature === null ||
+      latestTemperature === null
+    ) {
+      return 0
     }
-  }, [latest])
+
+    const tempRange = targetTemperature - startTemperature
+    const tempFraction =
+      tempRange <= 0
+        ? 1
+        : Math.max(
+            0,
+            Math.min(1, (latestTemperature - startTemperature) / tempRange)
+          )
+
+    const pumpFraction =
+      brewQuantityMl <= 0
+        ? 0
+        : Math.max(0, Math.min(1, pumpedVolumeMl / brewQuantityMl))
+
+    return Math.max(0, Math.min(1, 0.5 * tempFraction + 0.5 * pumpFraction))
+  })()
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (brewActive) {
-        setProgress((prev) => (prev < 1.0 ? Math.min(1, prev + 0.02) : prev))
-        setFlowRate((prev) => (prev < 4.0 ? Math.min(4, prev + 0.1) : prev))
+    return () => {
+      if (finishedProgressTimerRef.current) {
+        clearTimeout(finishedProgressTimerRef.current)
       }
-    }, 2000)
+    }
+  }, [])
 
-    return () => clearInterval(interval)
-  }, [brewActive])
+  useEffect(() => {
+    let isMounted = true
+
+    const fetchActiveBrew = async () => {
+      if (!brewActive) return
+      try {
+        const response = await fetch(`${BASE_URL}/homebrew/brew`, {
+          headers: { Accept: 'application/json' },
+        })
+        if (!response.ok) return
+
+        const data = await response.json()
+        if (!isMounted || data?.type !== 'brew' || !data?.payload) return
+
+        if (
+          typeof data.payload.quantity === 'number' &&
+          data.payload.quantity > 0
+        ) {
+          setBrewQuantityMl(data.payload.quantity)
+        }
+
+        if (
+          typeof data.payload.target_temperature === 'number' &&
+          targetTemperature === null
+        ) {
+          setTargetTemperature(data.payload.target_temperature)
+        }
+      } catch (error) {
+        console.error('Failed to fetch active brew details:', error)
+      }
+    }
+
+    fetchActiveBrew()
+    return () => {
+      isMounted = false
+    }
+  }, [brewActive, targetTemperature])
 
   return (
     <div className="info-wrapper">
@@ -102,7 +261,7 @@ const Info = () => {
         </div>
         <div className="grid info-bottom">
           <div className="card water-level">
-            <WaterLevel percentage={progress * 100} />
+            <WaterLevel percentage={waterLevel} />
           </div>
           <div className="card dropper">
             <FlowRateDropper flowRate={flowRate} />
@@ -110,7 +269,7 @@ const Info = () => {
           <div className="card">
             <LineChart
               data={temperatureData}
-              target={temperatureData[0]?.target_temp ?? TARGET_TEMPERATURE}
+              target={temperatureData[0]?.target_temp ?? 0}
             />
           </div>
         </div>
