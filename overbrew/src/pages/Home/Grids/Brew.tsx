@@ -440,9 +440,9 @@ const Brew = () => {
                     Chat
                   </button>
                 </div>
-                {activeSettingsPanel === 'chat' && (
+                {activeSettingsPanel === 'chat' ? (
                   <img alt="Joe" className="settings-header-joe" src={joe} />
-                )}
+                ) : null}
               </div>
 
               {activeSettingsPanel === 'settings' ? (
@@ -462,8 +462,8 @@ const Brew = () => {
                     label="Flow Rate (ml/s)"
                     max={MAX_FLOW_RATE}
                     min={MIN_FLOW_RATE}
-                    step={0.1}
                     onChange={setFlowRate}
+                    step={0.1}
                     value={flowRate}
                   />
                   <Slider
