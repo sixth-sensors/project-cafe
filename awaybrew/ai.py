@@ -24,34 +24,35 @@ brews, and return a JSON response only — no prose outside the JSON.
 ## Parameters
 - temperature_c: Water temperature in Celsius. Valid range: 60-96°C.
 - flow_rate: Water flow in ml/s. Valid range: 1.0-20.0 ml/s.
-- quantity_ml: Always null. Do not infer or ask about this.
+- quantity_ml: Brew volume in ml. Valid range: 30-500 ml.
 
 ## Defaults
 If the user asks to brew without specifying a parameter, apply these silently:
 - temperature_c: 93
 - flow_rate: 2.0
+- quantity_ml: 30
 
 ## How to infer parameters
-Temperature and flow rate are inversely linked — use both together to match 
+Temperature, flow rate, and quantity are linked — use them together to match 
 the user's intent:
 
-| Intent                  | temperature_c | flow_rate     |
-|-------------------------|---------------|---------------|
-| Strong / bold / intense | 93-96         | 1.0-2.0       |
-| Bright / acidic / light | 85-90         | 2.0-3.0       |
-| Balanced / everyday     | 91-93         | 2.0-2.5       |
-| Mild / gentle           | 85-88         | 3.0-4.0       |
-| Quick / fast brew       | 91-94         | 3.5-5.0       |
+| Intent                  | temperature_c | flow_rate     | quantity_ml   |
+|-------------------------|---------------|---------------|---------------|
+| Strong / bold / intense | 93-96         | 1.0-2.0       | 35-60         |
+| Bright / acidic / light | 85-90         | 2.0-3.0       | 150-250       |
+| Balanced / everyday     | 91-93         | 2.0-2.5       | 200-300       |
+| Mild / gentle           | 85-88         | 3.0-4.0       | 250-350       |
+| Quick / fast brew       | 91-94         | 3.5-5.0       | 200-300       |
 
 Do not set both temperature and flow rate high simultaneously UNLESS explicilty instructed to do so - high temp 
 with high flow produces harsh, unbalanced coffee.
 
 Common brew styles for reference:
-- Espresso (single, ~35ml): 93-96°C, 1.5-2.0 ml/s
-- Espresso (double, ~60ml): 93-96°C, 1.5-2.0 ml/s  
-- Filter / drip cup (~220ml): 90-93°C, 2.5-3.5 ml/s
-- Mug (~300ml): 90-93°C, 2.5-3.0 ml/s
-- Mild / low-caffeine cup: 85-88°C, 3.0-4.0 ml/s
+- Espresso (single, ~35ml): 93-96°C, 1.5-2.0 ml/s, 35ml
+- Espresso (double, ~60ml): 93-96°C, 1.5-2.0 ml/s, 60ml
+- Filter / drip cup (~220ml): 90-93°C, 2.5-3.5 ml/s, 220ml
+- Mug (~300ml): 90-93°C, 2.5-3.0 ml/s, 300ml
+- Mild / low-caffeine cup: 85-88°C, 3.0-4.0 ml/s, 250ml
 
 Use natural language cues to infer intent:
 - "strong", "intense", "bold", "espresso" -> high temp, low flow
@@ -86,8 +87,8 @@ Return strictly this JSON:
     "assistant_message": "string",
     "temperature_c": number | null,
     "flow_rate": number | null,
-    "quantity_ml": null,
-    "missing_fields": ["temperature_c" | "flow_rate"],
+    "quantity_ml": number | null,
+    "missing_fields": ["temperature_c" | "flow_rate" | "quantity_ml"],
     "needs_more_info": boolean,
     "brew_now": boolean,
     "save_as_favourite": boolean,
@@ -144,8 +145,11 @@ def extract_settings_from_text(message: str) -> dict[str, float | None]:
 
     temperature = coerce_float(temp_match.group(1)) if temp_match else None
     flow_rate = coerce_float(flow_match.group(1)) if flow_match else None
+    
+    qty_match = re.search(r"(\d{2,3})\s*(?:ml|milliliters?|millilitres?)", lower)
+    quantity = coerce_float(qty_match.group(1)) if qty_match else None
 
-    return {"temperature_c": temperature, "flow_rate": flow_rate}
+    return {"temperature_c": temperature, "flow_rate": flow_rate, "quantity_ml": quantity}
 
 async def anthropic_structured_reply(messages: list[dict[str, str]], additional_context: str = "") -> dict[str, Any]:
     api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -155,7 +159,7 @@ async def anthropic_structured_reply(messages: list[dict[str, str]], additional_
             "temperature_c": None,
             "flow_rate": None,
             "quantity_ml": None,
-            "missing_fields": ["temperature", "flow_rate"],
+            "missing_fields": ["temperature", "flow_rate", "quantity"],
             "needs_more_info": True,
             "brew_now": False,
             "save_as_favourite": False,
@@ -185,11 +189,11 @@ async def anthropic_structured_reply(messages: list[dict[str, str]], additional_
 
     if parsed is None:
         return {
-            "assistant_message": "I could not parse your request. Could you restate your desired temperature and flow rate?",
+            "assistant_message": "I could not parse your request. Could you restate your desired temperature, flow rate, and quantity?",
             "temperature_c": None,
             "flow_rate": None,
             "quantity_ml": None,
-            "missing_fields": ["temperature", "flow_rate"],
+            "missing_fields": ["temperature", "flow_rate", "quantity"],
             "needs_more_info": True,
             "brew_now": False,
             "save_as_favourite": False,
@@ -201,21 +205,26 @@ async def anthropic_structured_reply(messages: list[dict[str, str]], additional_
 def normalize_ai_output(output: dict[str, Any]) -> dict[str, Any]:
     temperature = coerce_float(output.get("temperature_c"))
     flow_rate = coerce_float(output.get("flow_rate"))
+    quantity = coerce_float(output.get("quantity_ml"))
 
     if temperature is not None:
         temperature = clamp(temperature, AI_MIN_TEMPERATURE_C, AI_MAX_TEMPERATURE_C)
     if flow_rate is not None:
         flow_rate = clamp(flow_rate, AI_MIN_FLOW_RATE, AI_MAX_FLOW_RATE)
+    if quantity is not None:
+        quantity = clamp(quantity, 30.0, 500.0)
 
     missing_fields: list[str] = []
     if temperature is None:
         missing_fields.append("temperature")
     if flow_rate is None:
         missing_fields.append("flow_rate")
+    if quantity is None:
+        missing_fields.append("quantity")
 
     assistant_message = output.get("assistant_message", "")
     if not isinstance(assistant_message, str) or not assistant_message.strip():
-        assistant_message = "Please share your preferred brew temperature and flow rate."
+        assistant_message = "Please share your preferred brew temperature, flow rate, and quantity."
 
     brew_now = bool(output.get("brew_now")) and len(missing_fields) == 0
 
@@ -223,7 +232,7 @@ def normalize_ai_output(output: dict[str, Any]) -> dict[str, Any]:
         "assistant_message": assistant_message.strip(),
         "temperature_c": temperature,
         "flow_rate": flow_rate,
-        "quantity_ml": None,
+        "quantity_ml": quantity,
         "missing_fields": missing_fields,
         "needs_more_info": len(missing_fields) > 0,
         "brew_now": brew_now,

@@ -12,6 +12,7 @@ import { FaPlay, FaSignal, FaWifi } from 'react-icons/fa'
 export type BrewSettings = {
   temperature: number
   flowRate: number
+  quantity: number
 }
 
 type Brew = {
@@ -92,6 +93,7 @@ const Brew = () => {
             title?: string
             temperature: number
             flow_rate: number
+            quantity?: number
             favourite?: boolean | number
             start_timestamp: string
           }
@@ -105,6 +107,7 @@ const Brew = () => {
               settings: {
                 temperature: item.temperature,
                 flowRate: item.flow_rate,
+                quantity: item.quantity ?? 30,
               },
               isFavorite: Boolean(item.favourite),
               timestamp: item.start_timestamp,
@@ -118,6 +121,7 @@ const Brew = () => {
               settings: {
                 temperature: item.temperature,
                 flowRate: item.flow_rate,
+                quantity: item.quantity ?? 30,
               },
               isFavorite: true,
               timestamp: item.start_timestamp,
@@ -196,6 +200,7 @@ const Brew = () => {
   const handleBrewSelect = (settings: BrewSettings, title: string) => {
     setTemperature(settings.temperature)
     setFlowRate(settings.flowRate)
+    setQuantity(settings.quantity)
     setBrewName(title)
   }
 
@@ -223,6 +228,7 @@ const Brew = () => {
           settings: {
             temperature,
             flowRate,
+            quantity,
           },
           isFavorite: false,
           timestamp: new Date().toISOString(),
@@ -280,12 +286,19 @@ const Brew = () => {
         typeof response.inferred?.flow_rate === 'number'
           ? Number(response.inferred.flow_rate.toFixed(1))
           : flowRate
+      const inferredQuantity =
+        typeof response.inferred?.quantity === 'number'
+          ? Math.round(response.inferred.quantity)
+          : quantity
 
       if (typeof response.inferred?.temperature === 'number') {
         setTemperature(inferredTemperature)
       }
       if (typeof response.inferred?.flow_rate === 'number') {
         setFlowRate(inferredFlowRate)
+      }
+      if (typeof response.inferred?.quantity === 'number') {
+        setQuantity(inferredQuantity)
       }
 
       if ((response.brew_started || response.brew_saved) && response.id) {
@@ -298,6 +311,7 @@ const Brew = () => {
           settings: {
             temperature: inferredTemperature,
             flowRate: inferredFlowRate,
+            quantity: inferredQuantity,
           },
           isFavorite: !!response.brew_saved,
           timestamp: new Date().toISOString(),

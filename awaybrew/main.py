@@ -87,9 +87,6 @@ print("Firebase Admin initialized successfully")
 
 bearer_scheme = HTTPBearer()
 
-
-
-
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
@@ -394,7 +391,7 @@ async def brew(request: Request):
 
     target_temperature = msg.get("temperature")
     flow_rate = msg.get("flow_rate")
-    quantity = msg.get("quantity", DEFAULT_BREW_QUANTITY_ML)
+    quantity = msg.get("quantity")
 
     if sender_id not in (Sender.OVERBREW, Sender.AUTOBREW) or msg_type != "brew":
         return Response(
@@ -442,6 +439,13 @@ async def brew(request: Request):
         quantity=float(quantity),
     )
 
+    app.state.ACTIVE_BREW = {
+        "request_id": request_id,
+        "target_temperature": float(target_temperature),
+        "flow_rate": float(flow_rate),
+        "quantity": float(quantity),
+        "started_at": datetime.now(),
+    }
 
 @app.post("/ai/chat")
 async def ai_chat(request: Request, token: dict = Depends(verify_token)):
@@ -508,6 +512,7 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
         {
             "temperature_c": None,
             "flow_rate": None,
+            "quantity_ml": None,
             "messages": [],
         },
     )
@@ -520,7 +525,7 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
     favourite_brews = get_user_favourites(user_id=user_id)
 
     def format_brew(b: dict) -> str:
-        return f"- {b.get('title', 'Unknown')} (Temp: {b.get('temperature')}°C, Flow: {b.get('flow_rate')} ml/s)"
+        return f"- {b.get('title', 'Unknown')} (Temp: {b.get('temperature')}°C, Flow: {b.get('flow_rate')} ml/s, Qty: {b.get('quantity')} ml)"
 
     context_lines = []
     if recent_brews:
@@ -538,13 +543,16 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
 
     fallback = extract_settings_from_text(user_message)
 
-    resolved_temperature = normalized["temperature_c"]
-    resolved_flow_rate = normalized["flow_rate"]
+    resolved_temperature = normalized.get("temperature_c")
+    resolved_flow_rate = normalized.get("flow_rate")
+    resolved_quantity = normalized.get("quantity_ml")
 
     if resolved_temperature is None:
-        resolved_temperature = fallback["temperature_c"]
+        resolved_temperature = fallback.get("temperature_c")
     if resolved_flow_rate is None:
-        resolved_flow_rate = fallback["flow_rate"]
+        resolved_flow_rate = fallback.get("flow_rate")
+    if resolved_quantity is None:
+        resolved_quantity = fallback.get("quantity_ml")
 
     if resolved_temperature is not None:
         resolved_temperature = clamp(
@@ -556,14 +564,21 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
         resolved_flow_rate = clamp(resolved_flow_rate, AI_MIN_FLOW_RATE, AI_MAX_FLOW_RATE)
         chat_state["flow_rate"] = resolved_flow_rate
 
+    if resolved_quantity is not None:
+        resolved_quantity = clamp(resolved_quantity, 30.0, 500.0)
+        chat_state["quantity_ml"] = resolved_quantity
+
     normalized["temperature_c"] = chat_state.get("temperature_c")
     normalized["flow_rate"] = chat_state.get("flow_rate")
+    normalized["quantity_ml"] = chat_state.get("quantity_ml")
 
     missing_fields: list[str] = []
     if normalized["temperature_c"] is None:
         missing_fields.append("temperature")
     if normalized["flow_rate"] is None:
         missing_fields.append("flow_rate")
+    if normalized["quantity_ml"] is None:
+        missing_fields.append("quantity")
 
     normalized["missing_fields"] = missing_fields
     normalized["needs_more_info"] = len(missing_fields) > 0
@@ -582,7 +597,7 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
         "inferred": {
             "temperature": normalized["temperature_c"],
             "flow_rate": normalized["flow_rate"],
-            "quantity": None,
+            "quantity": normalized["quantity_ml"],
         },
         "missing_fields": normalized["missing_fields"],
         "needs_more_info": normalized["needs_more_info"],
@@ -599,7 +614,7 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
             title=brew_title,
             target_temperature=float(normalized["temperature_c"]),
             flow_rate=float(normalized["flow_rate"]),
-            quantity=DEFAULT_BREW_QUANTITY_ML,
+            quantity=float(normalized["quantity_ml"]),
             favourite=is_favourite,
         )
         response["brew_started"] = True
@@ -614,7 +629,7 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
             title=brew_title,
             temperature=float(normalized["temperature_c"]),
             flow_rate=float(normalized["flow_rate"]),
-            quantity=DEFAULT_BREW_QUANTITY_ML,
+            quantity=float(normalized["quantity_ml"]),
             start_timestamp=datetime.now(),
             favourite=True,
         )
