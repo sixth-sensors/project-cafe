@@ -480,8 +480,8 @@ class Homebrew:
     def run(self):
         print("--- HOMEBREW ---")
 
-        # self._setup_connectivity()
-        # self._set_plug_enabled(False)
+        self._setup_connectivity()
+        self._set_plug_enabled(False)
         self._set_pump_percent(0)
 
         # Main loop
