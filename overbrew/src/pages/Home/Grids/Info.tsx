@@ -28,6 +28,7 @@ const Info = () => {
   const [flowRate, setFlowRate] = useState(0.0)
   const [brewQuantityMl, setBrewQuantityMl] = useState(DEFAULT_BREW_QUANTITY_ML)
   const [pumpedVolumeMl, setPumpedVolumeMl] = useState(0)
+  const [waterRemainingMl, setWaterRemainingMl] = useState(TANK_CAPACITY_ML)
   const [startTemperature, setStartTemperature] = useState<number | null>(null)
   const [targetTemperature, setTargetTemperature] = useState<number | null>(
     null
@@ -42,7 +43,6 @@ const Info = () => {
   const finishedProgressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   )
-  const waterRemainingMl = Math.max(0, TANK_CAPACITY_ML - pumpedVolumeMl)
   const waterLevel = Math.max(
     0,
     Math.min(100, (waterRemainingMl / TANK_CAPACITY_ML) * 100)
@@ -129,6 +129,7 @@ const Info = () => {
               const maxPumpable = Math.max(0, brewQuantityMl)
               return Math.min(maxPumpable, prev + pumpedDelta)
             })
+            setWaterRemainingMl((prev) => Math.max(0, prev - pumpedDelta))
           }
 
           if (typeof currentTimestamp === 'number') {
@@ -236,6 +237,56 @@ const Info = () => {
       isMounted = false
     }
   }, [brewActive, targetTemperature])
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+
+    const wKeyPressedRef = { current: false }
+
+    const isTypingTarget = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false
+      const tag = target.tagName
+      return target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA'
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return
+
+      const key = event.key.toLowerCase()
+      if (key === 'w') {
+        wKeyPressedRef.current = true
+        return
+      }
+
+      if (!wKeyPressedRef.current) return
+      if (!/^\d$/.test(event.key)) return
+
+      const digit = Number(event.key)
+      const percentage = digit === 0 ? 100 : digit * 10
+      const remainingMl = (percentage / 100) * TANK_CAPACITY_ML
+      setWaterRemainingMl(remainingMl)
+    }
+
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === 'w') {
+        wKeyPressedRef.current = false
+      }
+    }
+
+    const onWindowBlur = () => {
+      wKeyPressedRef.current = false
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', onWindowBlur)
+
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onWindowBlur)
+    }
+  }, [])
 
   return (
     <div className="info-wrapper">
