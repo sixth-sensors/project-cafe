@@ -52,10 +52,10 @@ class Homebrew:
         "temp": 0.0,
         "flow_rate": 0.0,
     }
-    POLLING_INTERVAL_SECONDS = 1.0
+    POLLING_INTERVAL_SECONDS = 0.1
     # Degrees C band to prevent rapid power cycling
-    ACCEPTABLE_MIN_TEMPERATURE_DEGREES_CELSIUS = 0.0  # temporary value
-    ACCEPTABLE_MAX_TEMPERATURE_DEGREES_CELSIUS = 100.0  # temporary value
+    ACCEPTABLE_MIN_TEMPERATURE_DEGREES_CELSIUS = 50.0
+    ACCEPTABLE_MAX_TEMPERATURE_DEGREES_CELSIUS = 98.0
     ACCEPTABLE_TEMPERATURE_MARGIN_DEGREES_CELSIUS = 1.0
     TEMP_SENSOR_PIN_NUMBER = 20
     PUMP_PIN_NUMBER = 3
@@ -67,10 +67,11 @@ class Homebrew:
     MAX_BASKET_TO_POT_FLOW_RATE_ML_PER_SEC = 0.83
 
     def __init__(self):
-        self.temp_sensor_pin = machine.Pin(self.TEMP_SENSOR_PIN_NUMBER)
-        self.temp_sensor = ds18x20.DS18X20(onewire.OneWire(self.temp_sensor_pin))
         self.pump_pin = machine.Pin(self.PUMP_PIN_NUMBER, mode=machine.Pin.OUT)
         self.pump = machine.PWM(self.pump_pin, freq=1000)
+        self._set_pump_percent(0)
+        self.temp_sensor_pin = machine.Pin(self.TEMP_SENSOR_PIN_NUMBER)
+        self.temp_sensor = ds18x20.DS18X20(onewire.OneWire(self.temp_sensor_pin))
         self.temp_results = self.temp_sensor.scan()
         self.wlan_interface = WLAN(WLAN.IF_STA)
         self.plugbrew_ip_address = None
@@ -84,10 +85,35 @@ class Homebrew:
         self.brew_quantity = 0.0  # ml total to transfer
         self.volume_transferred = 0.0  # ml accumulated
         self.last_pump_ticks = None  # time.ticks_ms() snapshot
-        # TLS context for awaybrew requests
-        self.ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        self.ssl_ctx.verify_mode = ssl.CERT_REQUIRED
-        self.ssl_ctx.load_verify_locations("gtsr4.pem")
+        self.ssl_ctx = None
+
+    def _verified_request(self, method, path, data=None, headers=None):
+        addr = socket.getaddrinfo(self.AWAYBREW_HOST, 443)[0][-1]
+        s = socket.socket()
+        s.connect(addr)
+        s = self.ssl_ctx.wrap_socket(s, server_hostname=self.AWAYBREW_HOST)
+
+        body = data if data else b""
+        request_line = f"{method} {path} HTTP/1.0\r\n"
+        header_str = f"Host: {self.AWAYBREW_HOST}\r\nContent-Length: {len(body)}\r\n"
+        if headers:
+            for k, v in headers.items():
+                header_str += f"{k}: {v}\r\n"
+        s.write(request_line.encode() + header_str.encode() + b"\r\n" + body)
+
+        response = b""
+        while True:
+            chunk = s.read(512)
+            if not chunk:
+                break
+            response += chunk
+        s.close()
+
+        header_end = response.find(b"\r\n\r\n")
+        status_line = response[: response.find(b"\r\n")].decode()
+        status_code = int(status_line.split(" ")[1])
+        body = response[header_end + 4 :] if header_end >= 0 else b""
+        return status_code, body
 
     def _find_plugbrew_ip(self):
         homebrew_ip, _, _, _ = self.wlan_interface.ifconfig()
@@ -186,34 +212,23 @@ class Homebrew:
         return False
 
     def _send_msg(self, msg):
-        url = f"https://{self.AWAYBREW_HOST}/telemetry"
-        req = urequests.post(
-            url,
+        status, _ = self._verified_request(
+            "POST",
+            "/telemetry",
             data=umsgpack.dumps(msg),
             headers={"Content-Type": "application/msgpack"},
-            ssl=self.ssl_ctx,
         )
-        print(f"Sent: {msg}, Response: {req.status_code}")
-        req.close()
+        print(f"Sent: {msg}, Response: {status}")
 
     def _send_finished_msg(self):
-        url = f"https://{self.AWAYBREW_HOST}/finished"
-        req = urequests.get(
-            url,
-            ssl=self.ssl_ctx,
-        )
-        print(f"Sent (done) Response: {req.status_code}")
-        req.close()
+        status, _ = self._verified_request("GET", "/homebrew/finish")
+        print(f"Sent (done) Response: {status}")
 
     def _poll_brew(self):
-        url = f"https://{self.AWAYBREW_HOST}/homebrew/brew"
         try:
-            req = urequests.get(url, ssl=self.ssl_ctx)
-            if req.status_code == 200:
-                response = umsgpack.loads(req.content)
-                req.close()
-                return response
-            req.close()
+            status, body = self._verified_request("GET", "/homebrew/brew")
+            if status == 200:
+                return umsgpack.loads(body)
         except Exception as e:
             print(f"Failed to poll brew: {e}")
         return None
@@ -407,6 +422,7 @@ class Homebrew:
                 pump_percent = (
                     self.brew_flow_rate / self.MAX_KETTLE_TO_BASKET_FLOW_RATE_ML_PER_SEC
                 ) * 100
+                self._set_plug_enabled(False)
                 self._set_pump_percent(pump_percent)
                 self.last_pump_ticks = time.ticks_ms()
                 print("Entering PUMPING phase")
@@ -480,6 +496,25 @@ class Homebrew:
 
         if self._connect(networks):
             self._ping(self.AWAYBREW_HOST)
+            # Sync clock via NTP before TLS cert validation
+            import ntptime
+
+            for attempt in range(5):
+                try:
+                    ntptime.settime()
+                    print(f"Clock synced: {time.localtime()}")
+                    break
+                except OSError as e:
+                    print(f"NTP attempt {attempt + 1}/5 failed: {e}")
+                    time.sleep(2)
+            else:
+                print("NTP sync failed after 5 attempts")
+                self._set_led_colour(self.LED_RED)
+                return False
+            # Init TLS context now that clock is accurate
+            self.ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            self.ssl_ctx.verify_mode = ssl.CERT_REQUIRED
+            self.ssl_ctx.load_verify_locations("gtsr4.pem")
             print("HOMEBREW is online.")
         else:
             # Red to indicate disconnected
