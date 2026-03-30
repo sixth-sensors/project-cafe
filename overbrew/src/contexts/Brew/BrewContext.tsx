@@ -4,7 +4,7 @@ import { BASE_URL } from '../../lib/api'
 import { BrewContext } from './context'
 
 export const BrewProvider = ({ children }: { children: ReactNode }) => {
-  const { connected, latest } = useTelemetryStream()
+  const { connected, streamStatus, latest } = useTelemetryStream()
   const [brewActive, setBrewActive] = useState(false)
   const [brewStartTime, setBrewStartTime] = useState<Date | null>(null)
 
@@ -61,7 +61,7 @@ export const BrewProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <BrewContext.Provider
-      value={{ brewActive, brewStartTime, connected, latest }}
+      value={{ brewActive, brewStartTime, connected, streamStatus, latest }}
     >
       {children}
     </BrewContext.Provider>

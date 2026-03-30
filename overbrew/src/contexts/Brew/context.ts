@@ -5,5 +5,6 @@ export const BrewContext = createContext<BrewContextType>({
   brewActive: false,
   brewStartTime: null,
   connected: false,
+  streamStatus: 'loading',
   latest: null,
 })
