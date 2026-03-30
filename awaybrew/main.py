@@ -153,17 +153,29 @@ async def verify_token(
 ) -> dict:
     try:
         decoded = auth.verify_id_token(credentials.credentials)
+        uid = decoded.get("uid")
+
+        allowed_uids = [
+            u.strip() for u in os.getenv("ALLOWED_UIDS", "").split(",") if u.strip()
+        ]
+
+        if uid not in allowed_uids:
+            raise HTTPException(
+                status_code=403, detailww="User not authorized for this device"
+            )
     except auth.ExpiredIdTokenError:
         raise HTTPException(status_code=401, detail="Token has expired")
     except auth.InvalidIdTokenError:
         raise HTTPException(status_code=401, detail="Invalid ID token")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Token verification failed: {e}")
     return decoded
 
 
-@app.get("/test/protected")
-async def protected_test(token: dict = Depends(verify_token)):
+@app.get("/auth/verify")
+async def verify_auth(token: dict = Depends(verify_token)):
     return {"status": "authorized", "user": token}
 
 
@@ -228,7 +240,19 @@ async def mock_brew(token: dict = Depends(verify_token)):
 @app.get("/telemetry/stream")
 async def get_telemetry_data(request: Request, token: str = Query(...)):
     try:
-        auth.verify_id_token(token)
+        decoded = auth.verify_id_token(token)
+        uid = decoded.get("uid")
+
+        allowed_uids = [
+            u.strip() for u in os.getenv("ALLOWED_UIDS", "").split(",") if u.strip()
+        ]
+
+        if uid not in allowed_uids:
+            raise HTTPException(
+                status_code=403, detail="User not authorised for this device"
+            )
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 
@@ -392,8 +416,6 @@ async def brew(request: Request):
             media_type="application/json",
             status_code=400,
         )
-
-    print(f"Received: {msg}")
 
     if not isinstance(msg, dict):
         return {"type": "error", "error": "invalid_message"}
@@ -693,7 +715,7 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
 
 
 @app.put("/favourite_brew")
-async def favourite_brew(request: Request):
+async def favourite_brew(request: Request, token: dict = Depends(verify_token)):
     """
     Label/unlabel a brew as a "favourite" brew. Favourited brews are surfaced. Return a message if successful
     at the top of the frontend service.
@@ -737,8 +759,6 @@ async def favourite_brew(request: Request):
             status_code=400,
         )
 
-    print(f"Received: {msg}")
-
     favourite_brew_request(brew_id=brew_id, favourite_status=toggle_favourite)
 
     return {
@@ -754,7 +774,7 @@ async def favourite_brew(request: Request):
 
 
 @app.get("/fetch-recents/{user_id}")
-async def fetch_recent_brews(user_id: str):
+async def fetch_recent_brews(user_id: str, token: dict = Depends(verify_token)):
     """
     Fetch a list of the most recent brews from Databrew
     """
@@ -771,7 +791,7 @@ async def fetch_recent_brews(user_id: str):
 
 
 @app.get("/fetch-favourites/{user_id}")
-async def fetch_favourites(user_id: str):
+async def fetch_favourites(user_id: str, token: dict = Depends(verify_token)):
     """
     Fetch a list of favourited brews from Databrew
     """
@@ -786,7 +806,7 @@ async def fetch_favourites(user_id: str):
 
 
 @app.post("/abort")
-async def abort_brew(request: Request):
+async def abort_brew(request: Request, token: dict = Depends(verify_token)):
     """
     Sets the active brew to None, which signals Homebrew to stop the brew and resets the state for the next brew.
     """
@@ -831,7 +851,7 @@ async def abort_brew(request: Request):
 
 
 @app.get("/brew/{request_id}")
-async def brew_status(request_id: str):
+async def brew_status(request_id: str, token: dict = Depends(verify_token)):
     """
     Takes the status of a brew job via a GET request.
 
