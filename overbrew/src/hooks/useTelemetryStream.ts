@@ -26,7 +26,6 @@ export const useTelemetryStream = () => {
   const eventSourceRef = useRef<EventSource | null>(null)
   const reconnectTimeoutRef = useRef<number | null>(null)
   const reconnectAttemptRef = useRef(0)
-  const [connected, setConnected] = useState(false)
   const [streamStatus, setStreamStatus] =
     useState<TelemetryStreamStatus>('loading')
   const [latest, setLatest] = useState<TelemetryEvent | null>(null)
@@ -57,7 +56,6 @@ export const useTelemetryStream = () => {
         eventSource.onopen = () => {
           reconnectAttemptRef.current = 0
           if (!cancelled) {
-            setConnected(true)
             setStreamStatus('connected')
           }
         }
@@ -71,7 +69,6 @@ export const useTelemetryStream = () => {
         eventSource.onerror = () => {
           if (cancelled) return
 
-          setConnected(false)
           setStreamStatus('reconnecting')
           resetConnection()
 
@@ -88,15 +85,12 @@ export const useTelemetryStream = () => {
         }
       } catch {
         if (!cancelled) {
-          setConnected(false)
           setStreamStatus('error')
         }
       }
     }
 
     if (!user) {
-      setConnected(false)
-      setStreamStatus('error')
       return
     }
 
@@ -110,6 +104,8 @@ export const useTelemetryStream = () => {
       resetConnection()
     }
   }, [user])
+
+  const connected = !!user && streamStatus === 'connected'
 
   return { connected, streamStatus, latest }
 }
