@@ -49,7 +49,7 @@ const ProtectedRoute = () => {
       >
         <h2>
           You are not authorised to connect to this machine. Contact your
-          administrator to be added to the whitelist.
+          administrator to be added to the allowlist.
         </h2>
       </div>
     )

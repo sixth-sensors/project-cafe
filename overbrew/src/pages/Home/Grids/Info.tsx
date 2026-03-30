@@ -23,7 +23,7 @@ const FINISHED_PROGRESS_HOLD_MS = 1200
 
 const Info = () => {
   const { user } = useAuth()
-  const { latest, brewActive, brewStartTime } = useBrew()
+  const { latest, brewActive, brewStartTime, streamStatus } = useBrew()
   const [temperatureData, setTemperatureData] = useState<TemperatureData[]>([])
   const [flowRate, setFlowRate] = useState(0.0)
   const [brewQuantityMl, setBrewQuantityMl] = useState(DEFAULT_BREW_QUANTITY_ML)
@@ -289,9 +289,11 @@ const Info = () => {
   return (
     <div className="info-wrapper">
       <div className="brew-status-text">
-        {brewActive
-          ? `Brew active - Started at ${brewStartTime ? brewStartTime.toLocaleTimeString() : '...'}`
-          : 'No brew currently active'}
+        {streamStatus !== 'connected'
+          ? 'Connecting to telemetry stream...'
+          : brewActive
+            ? `Brew active - Started at ${brewStartTime ? brewStartTime.toLocaleTimeString() : '...'}`
+            : 'No brew currently active'}
       </div>
       <div className="grid info-content">
         <div className="card progress-card">
