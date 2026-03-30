@@ -650,15 +650,19 @@ async def ai_chat(request: Request, token: dict = Depends(verify_token)):
         else:
             chat_state["awaiting_confirmation"] = True
             normalized["brew_now"] = False
-            normalized["assistant_message"] = (
+            
+            # Append to the AI's natural response to keep it conversational
+            ai_message = normalized.get("assistant_message", "").strip()
+            specs_summary = (
                 "I have your settings ready: "
                 f"{float(normalized['temperature_c']):.0f}°C, "
                 f"{float(normalized['flow_rate']):.1f} ml/s, "
                 f"{float(normalized['quantity_ml']):.0f} ml. "
                 "Reply 'confirm' to start brewing."
             )
-
-    assistant_message = str(normalized["assistant_message"])
+            normalized["assistant_message"] = f"{ai_message}\n\n{specs_summary}" if ai_message else specs_summary
+            
+    assistant_message = str(normalized.get("assistant_message", ""))
     history.append({"role": "assistant", "content": assistant_message})
     chat_state["messages"] = history[-AI_CONTEXT_LIMIT:]
 
