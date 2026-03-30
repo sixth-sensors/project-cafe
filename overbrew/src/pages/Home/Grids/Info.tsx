@@ -239,8 +239,6 @@ const Info = () => {
   }, [brewActive, targetTemperature])
 
   useEffect(() => {
-    if (!import.meta.env.DEV) return
-
     const wKeyPressedRef = { current: false }
 
     const isTypingTarget = (target: EventTarget | null) => {
