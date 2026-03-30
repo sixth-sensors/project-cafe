@@ -154,15 +154,15 @@ async def verify_token(
     try:
         decoded = auth.verify_id_token(credentials.credentials)
         uid = decoded.get("uid")
-        
+
         allowed_uids = [
-            u.strip()
-            for u in os.getenv("ALLOWED_UIDS", "").split(",")
-            if u.strip()
+            u.strip() for u in os.getenv("ALLOWED_UIDS", "").split(",") if u.strip()
         ]
-        
+
         if uid not in allowed_uids:
-            raise HTTPException(status_code=403, detailww="User not authorized for this device")
+            raise HTTPException(
+                status_code=403, detailww="User not authorized for this device"
+            )
     except auth.ExpiredIdTokenError:
         raise HTTPException(status_code=401, detail="Token has expired")
     except auth.InvalidIdTokenError:
@@ -242,15 +242,15 @@ async def get_telemetry_data(request: Request, token: str = Query(...)):
     try:
         decoded = auth.verify_id_token(token)
         uid = decoded.get("uid")
-        
+
         allowed_uids = [
-            u.strip()
-            for u in os.getenv("ALLOWED_UIDS", "").split(",")
-            if u.strip()
+            u.strip() for u in os.getenv("ALLOWED_UIDS", "").split(",") if u.strip()
         ]
-        
+
         if uid not in allowed_uids:
-            raise HTTPException(status_code=403, detail="User not authorised for this device")
+            raise HTTPException(
+                status_code=403, detail="User not authorised for this device"
+            )
     except HTTPException:
         raise
     except Exception:
